@@ -1,2 +1,3 @@
 # LocalSmartphone
- UI testing on Unity Editor as Smartphone.
+ UI testing tool on Unity Editor as Smartphone.
+
