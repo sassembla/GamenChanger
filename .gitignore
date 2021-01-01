@@ -3,3 +3,7 @@ Library/*
 .DS_Store
 .vscode/*
 
+*.csproj
+obj/*
+Temp/*
+Qcon.sln

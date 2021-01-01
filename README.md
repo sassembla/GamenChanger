@@ -1,4 +1,6 @@
 # Qcon
- UI testing tool on Unity Editor.
+ UI testing tool between UnityEditor and actual device.
  
+
+![concept image](./Images/Qcon.png)
 
