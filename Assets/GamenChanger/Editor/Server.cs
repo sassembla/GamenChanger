@@ -2,14 +2,14 @@
 using UnityEditor;
 
 [InitializeOnLoad]
-public class QconServer
+public class GamenChangerServer
 {
-    static QconServer()
+    static GamenChangerServer()
     {
         // TODO: サーバを起動して実機からの入力を受ける。実際にはWebServerで実機からのPOSTを受けるのでもいいかもしれない。
     }
 
-    [MenuItem("Window/Qcon/Generate QR code")]
+    [MenuItem("Window/GamenChanger/Generate QR code")]
     public static void GenQRCode()
     {
         /*
