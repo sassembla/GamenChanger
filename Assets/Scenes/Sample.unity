@@ -364,7 +364,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 103.8}
-  m_SizeDelta: {x: 367.94653, y: 74.77127}
+  m_SizeDelta: {x: 350, y: 74.77127}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &369379731
 MonoBehaviour:
@@ -379,6 +379,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   currentRectTransform: {fileID: 0}
+  reactUnitSize: 100
+  moveUnitSize: 350
+  CornerFromLeft: {fileID: 0}
+  CornerFromRight: {fileID: 1788499898}
+  CornerFromTop: {fileID: 0}
+  CornerFromBottom: {fileID: 0}
 --- !u!114 &369379732
 MonoBehaviour:
   m_ObjectHideFlags: 0

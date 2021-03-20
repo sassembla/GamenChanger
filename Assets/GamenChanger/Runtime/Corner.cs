@@ -8,17 +8,12 @@ namespace GamenChangerCore
         基底のコーナー、単なる集合の箱。
         コーナーの内容を挿げ替える -> できた
         TODO: フリック可能にしてみるか。
-
-        WillAppear
-        DidAppear
-        WillDisappear
-        DidDisappear
     */
     public class Corner : MonoBehaviour// MBつけたくないんだけど、つける方がUnityに干渉するルートが目に見えるしHierarchyに置けるので楽
     {
         private RectTransform[] containedUIComponent;
 
-        public RectTransform currentRectTransform;
+        [HideInInspector] public RectTransform currentRectTransform;
 
         // どこかの段階で勝手に収集する。
         void Awake()
@@ -84,5 +79,27 @@ namespace GamenChangerCore
         {
             return containedUIComponent;
         }
+
+        // TODO: このへんはあとでインターフェース化することになりそうな気がする、、
+        public void WillAppear()
+        {
+
+        }
+
+        public void DidAppear()
+        {
+
+        }
+
+        public void WillDisappear()
+        {
+
+        }
+
+        public void DidDisappear()
+        {
+
+        }
+
     }
 }
