@@ -9,9 +9,9 @@ namespace GamenChangerCore
         コーナーの内容を挿げ替える -> できた
         TODO: フリック可能にしてみるか。
     */
-    public class Corner : MonoBehaviour// MBつけたくないんだけど、つける方がUnityに干渉するルートが目に見えるしHierarchyに置けるので楽
+    public class Corner : MonoBehaviour// TODO: MBつけたくないんだけど、つける方がUnityに干渉するルートが目に見えるしHierarchyに置けるので楽
     {
-        private RectTransform[] containedUIComponent;
+        [HideInInspector] public RectTransform[] containedUIComponents;
 
         [HideInInspector] public RectTransform currentRectTransform;
 
@@ -36,7 +36,7 @@ namespace GamenChangerCore
                 childUIComponent.Add(uiComponent.GetComponent<RectTransform>());
             }
 
-            containedUIComponent = childUIComponent.ToArray();
+            containedUIComponents = childUIComponent.ToArray();
 
             currentRectTransform = gameObject.GetComponent<RectTransform>();
         }
@@ -77,29 +77,7 @@ namespace GamenChangerCore
         // コンテンツを露出させる
         public RectTransform[] ExposureContents()
         {
-            return containedUIComponent;
+            return containedUIComponents;
         }
-
-        // TODO: このへんはあとでインターフェース化することになりそうな気がする、、
-        public void WillAppear()
-        {
-
-        }
-
-        public void DidAppear()
-        {
-
-        }
-
-        public void WillDisappear()
-        {
-
-        }
-
-        public void DidDisappear()
-        {
-
-        }
-
     }
 }
