@@ -43,6 +43,7 @@ namespace GamenChangerCore
         }
 
         // 内容物を書き換える
+        // TODO: これを使ったタブ型のサンプルを作ろう。
         public void SwapContents(Corner corner)
         {
             // 中身を消す

@@ -379,11 +379,11 @@ namespace GamenChangerCore
             // タッチがスクリーン内にない場合、このフレームでのタッチ可否をfalseにする。
             if (Input.touchCount == 0)
             {
-                beforePos = true;
+                touchInScreen = false;
             }
             else
             {
-                beforePos = false;
+                touchInScreen = true;
             }
 #endif
 
