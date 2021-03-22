@@ -15,8 +15,8 @@ namespace GamenChangerCore
 
         [HideInInspector] public RectTransform currentRectTransform;
 
-        // どこかの段階で勝手に収集する。
-        void Awake()
+        // 生成時にコンテンツを収集する。
+        public void Awake()
         {
             // UIを収集する
             var childCount = transform.childCount;
