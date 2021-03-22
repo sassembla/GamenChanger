@@ -26,7 +26,6 @@ namespace GamenChangerCore
 
 
         // 開始条件を判定するイベント
-
         public void OnPointerEnter(PointerEventData eventData)
         {
             switch (state)
@@ -37,9 +36,8 @@ namespace GamenChangerCore
                     return;
             }
 
-            if (eventData.eligibleForClick && eventData.pointerEnter == this.gameObject)
+            if (eventData.eligibleForClick && eventData.pointerEnter == this.gameObject && !touchInScreen)
             {
-                // TODO: 画面外からスムーズにこのオブジェクトの上にきた場合と、画面外からよそを経由してこのオブジェクトに着地した場合を分けた方がよさそう。今は意図しないことが起きる。これどうやって判定しようかなー、、
                 // TODO: これで画面外からのフリックを無理矢理開始することができるようになったが、そもそも実機でどうなのか、というのをチェックすべき。実機でどうなのっていう感じだなー
                 eventData.pointerDrag = this.gameObject;
                 OnInitializePotentialDrag(eventData);
@@ -350,8 +348,35 @@ namespace GamenChangerCore
 
         IEnumerator animationCor;
 
+        private bool touchInScreen = false;
         private void Update()
         {
+            // タッチインがどこから行われたかを判定するために、フレームごとにタッチが画面内にあるかどうかを取得する。
+#if UNITY_EDITOR
+            var x = Input.mousePosition.x;
+            var y = Input.mousePosition.y;
+            if (0 <= x && x <= Screen.width && 0 <= y && y <= Screen.height)
+            {
+                // in screen.
+                touchInScreen = true;
+            }
+            else// マウスがスクリーン外な場合、このフレームでのマウス位置をフレーム外に持っていく。
+            {
+                touchInScreen = false;
+            }
+#else
+            // タッチがスクリーン内にない場合、このフレームでのタッチ可否をfalseにする。
+            if (Input.touchCount == 0)
+            {
+                beforePos = true;
+            }
+            else
+            {
+                beforePos = false;
+            }
+#endif
+
+            // アニメーション要素があれば動かす
             if (animationCor != null)
             {
                 var cont = animationCor.MoveNext();
