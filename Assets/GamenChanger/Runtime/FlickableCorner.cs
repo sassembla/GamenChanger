@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -7,7 +8,7 @@ namespace GamenChangerCore
     /*
         フリック可能なCorner
     */
-    public class FlickableCorner : Corner, IDragHandler, IEndDragHandler, IInitializePotentialDragHandler, IBeginDragHandler
+    public class FlickableCorner : Corner, IDragHandler, IEndDragHandler, IInitializePotentialDragHandler, IBeginDragHandler, IPointerEnterHandler
     {
         private enum FlickState
         {
@@ -25,6 +26,66 @@ namespace GamenChangerCore
 
 
         // 開始条件を判定するイベント
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            switch (state)
+            {
+                case FlickState.NONE:
+                    break;
+                default:
+                    return;
+            }
+
+            if (eventData.eligibleForClick && eventData.pointerEnter == this.gameObject)
+            {
+                // TODO: 画面外からスムーズにこのオブジェクトの上にきた場合と、画面外からよそを経由してこのオブジェクトに着地した場合を分けた方がよさそう。今は意図しないことが起きる。これどうやって判定しようかなー、、
+                // TODO: これで画面外からのフリックを無理矢理開始することができるようになったが、そもそも実機でどうなのか、というのをチェックすべき。実機でどうなのっていう感じだなー
+                eventData.pointerDrag = this.gameObject;
+                OnInitializePotentialDrag(eventData);
+                return;
+            }
+
+            // 念の為取っておく、実機ビルドができたらチェックして、必要なくなったら消そう。
+            // Show("OnPointerEnter",
+            //     ("button", eventData.button),// PCだとleft、タップ系だと何が入るんだろう。これは無理っぽいな、、、
+
+            //     ("clickCount", eventData.clickCount),//1
+            //     ("clickTime", eventData.clickTime),// 開始時刻のseconds が floatで取れるっぽい。
+
+            //     ("currentInputModule", eventData.currentInputModule),// 色々な情報が一発で出る、なるほど
+            //     ("delta", eventData.delta),
+
+            //     ("dragging", eventData.dragging),
+            //     ("eligibleForClick", eventData.eligibleForClick),
+
+            //     ("enterEventCamera", eventData.enterEventCamera),
+            //     ("lastPress", eventData.lastPress),
+            //     ("pointerClick", eventData.pointerClick),// nullになる
+            //     ("pointerCurrentRaycast", eventData.pointerCurrentRaycast),
+            //     ("pointerDrag", eventData.pointerDrag),// ここに現在ドラッグしている判定のオブジェクトが入る
+
+
+
+            //     ("pointerEnter", eventData.pointerEnter),// ここに現在ドラッグしている判定のオブジェクトが入る、お、拾えるな、、
+
+
+
+            //     ("pointerId", eventData.pointerId),
+            //     ("pointerPress", eventData.pointerPress),
+            //     ("pointerPressRaycast", eventData.pointerPressRaycast),
+            //     ("position", eventData.position),
+            //     ("pressEventCamera", eventData.pressEventCamera),
+            //     ("pressPosition", eventData.pressPosition),
+            //     ("rawPointerPress", eventData.rawPointerPress),
+            //     ("selectedObject", eventData.selectedObject),
+            //     ("used", eventData.used),
+            //     ("useDragThreshold", eventData.useDragThreshold),// trueになっている。よくわからん
+
+            //     ("scrollDelta", eventData.scrollDelta)// 実際のUIのスクロール距離、0,0から発生
+            // );
+        }
+
         public void OnInitializePotentialDrag(PointerEventData eventData)
         {
             switch (state)
@@ -88,14 +149,17 @@ namespace GamenChangerCore
                     // from系の初期位置を保持
                     UpdateInitialPos();
 
+                    // eventDataのパラメータを上書きし、指定のオブジェクトをドラッグしている状態に拘束する
                     ApplyConstraintToDir(flickDir, eventData);
 
                     // 動かす
                     Move(eventData.delta);
 
-                    state = FlickState.BEGIN;
+                    // 保持しているcornerと関連するcornerに対して、willDisappearとwillAppearを通知する。
+                    NotifyAppearance(eventData.delta);
+                    // TODO: この時に向かった方向とは逆の方向にdragし、なおかつ初期値を超えたタイミングで、キャンセルを流してなおかつ反対側にあるコンテンツがあればwillAppearを呼び出したい。
 
-                    WillBeginFlick(flickDir);
+                    state = FlickState.BEGIN;
                     break;
                 case FlickState.PROCESSING:
                 case FlickState.CANCELLING:
@@ -134,41 +198,39 @@ namespace GamenChangerCore
                     return;
             }
 
-            // drag対象がついて行ってない状態なので、終了。
-            if (eventData.hovered.Count == 0)
+            // drag対象がついて行ってない状態なので、終了させるという条件が必要になる。
+            // 画面外にdragしたら終了
+            if (0 < eventData.position.x && eventData.position.x < Screen.width && 0 < eventData.position.y && eventData.position.y < Screen.height)
             {
-                // Debug.Log("drag中にオブジェクト外に行った");
+                // pass.
             }
             else
             {
-                // このオブジェクトより優先度が高いものの上に到達したので、ドラッグの解除を行う
-                // このhoveredの順位は直前まで何を触っていたのかで変動することがあり、下地となるキャンバスの順位が変動する。
-                // このGOをdragしていてもcanvas, GOの順になることがあり、すげー怖いがこれで動く。
-                if (eventData.hovered[0] != this.gameObject && eventData.hovered[1] != this.gameObject)
-                {
-                    // Debug.Log("drag中にオブジェクト外に行った2");
-                }
+                // 画面外にタッチが飛び出したので、drag終了する。
+                OnEndDrag(eventData);
+                return;
             }
 
             // このオブジェクトではないものの上に到達したので、ドラッグの解除を行う
             if (eventData.pointerDrag != this.gameObject)
             {
-                Debug.Log("ハズレ3");
-                state = FlickState.CANCELLING;
-                return;
+                // TODO: これって発生するのかな、、
+                Debug.Log("drag ハズレ3");
             }
 
-            // 指定のオブジェクトをドラッグしている状態に拘束する
+            // eventDataのパラメータを上書きし、指定のオブジェクトをドラッグしている状態に拘束する
             ApplyConstraintToDir(flickDir, eventData);
 
             // ドラッグ継続
             Move(eventData.delta);
 
-            // 始めたflickが逆方向に突き抜けそう、みたいなのを抑制する
+            // 始めたflickが許可していない逆方向に突き抜けそう、みたいなのを抑制する
             ApplyPositionLimitByDirection();
 
+            var actualMoveDir = DetectFlickingDirection(eventData.delta);
+
             //progressの更新を行う
-            UpdateProgress();
+            UpdateProgress(actualMoveDir);
         }
 
         // 終了時イベント
@@ -226,14 +288,14 @@ namespace GamenChangerCore
 
             // 正常にflickの終了に到達したので、flick発生かどうかを判定する。
 
-            // progressの更新を行う
-            UpdateProgress();
-
             // flickが発生したかどうかチェックし、発生していれば移動を完了させる処理モードに入る。
             // そうでなければ下の位置に戻すキャンセルモードに入る。
-            var resultDir = DetermineFlickResult();
-            var isFlicked = resultDir != FlickDirection.NONE;
+            var flickedDir = DetermineFlickResult();
 
+            // progressの更新を行う
+            UpdateProgress(flickedDir);
+
+            var isFlicked = flickedDir != FlickDirection.NONE;
             if (isFlicked)
             {
                 state = FlickState.PROCESSING;
@@ -256,6 +318,8 @@ namespace GamenChangerCore
 
                             ResetToInitialPosition();
 
+                            NotifyCancelled();
+
                             state = FlickState.NONE;
                             yield break;
 
@@ -263,7 +327,9 @@ namespace GamenChangerCore
                         case FlickState.PROCESSING:
                             // TODO: 達成するところのアニメーションはなんか自由に頑張ってくれってやりたいんだよな、どうするかな。
 
-                            SetToTargetPosition(resultDir);
+                            SetToTargetPosition(flickedDir);
+
+                            NotifyProcessed(flickedDir);
 
                             state = FlickState.NONE;
                             yield break;
@@ -316,12 +382,12 @@ namespace GamenChangerCore
         // フリック機能の状態
         // TODO: インターフェース化しそう
         // 自身が保持しているコンテンツに対する警告なので、要素がICornerを持っていたらwillDisappearとかが着火できる
-        private void WillBeginFlick(FlickDirection dir)
+        private void WillBeginFlick()
         {
             // Debug.Log("フリックを開始する dir:" + dir);
         }
 
-        private void DidEndFlicked(FlickDirection dir)
+        private void DidEndFlicked()
         {
             // Debug.Log("フリックを終了する dir:" + dir);
         }
@@ -334,6 +400,181 @@ namespace GamenChangerCore
             RIGHT = 0x002,
             DOWN = 0x004,
             LEFT = 0x008
+        }
+
+        // willDisappearを自身のコンテンツに出し、willAppearを関連する方向のコンテンツに出す
+        private void NotifyAppearance(Vector2 delta)
+        {
+            // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
+            foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
+            {
+                containedUIComponent.WillDisappear();
+            }
+
+            var actualMoveDir = DetectFlickingDirection(delta);
+
+            // これから表示される要素のcontentsにappearProgressを伝える
+            switch (actualMoveDir)
+            {
+                case FlickDirection.RIGHT:
+                    if (CornerFromLeft != null)
+                    {
+                        foreach (var containedUIComponent in CornerFromLeft.GetComponentsInChildren<ICornerContent>())
+                        {
+                            containedUIComponent.WillAppear();
+                        }
+                    }
+                    break;
+                case FlickDirection.LEFT:
+                    if (CornerFromRight != null)
+                    {
+                        foreach (var containedUIComponent in CornerFromRight.GetComponentsInChildren<ICornerContent>())
+                        {
+                            containedUIComponent.WillAppear();
+                        }
+                    }
+                    break;
+                case FlickDirection.UP:
+                    if (CornerFromBottom != null)
+                    {
+                        foreach (var containedUIComponent in CornerFromBottom.GetComponentsInChildren<ICornerContent>())
+                        {
+                            containedUIComponent.WillAppear();
+                        }
+                    }
+                    break;
+                case FlickDirection.DOWN:
+                    if (CornerFromTop != null)
+                    {
+                        foreach (var containedUIComponent in CornerFromTop.GetComponentsInChildren<ICornerContent>())
+                        {
+                            containedUIComponent.WillAppear();
+                        }
+                    }
+                    break;
+            }
+        }
+
+        // disppearCancelledを自身のコンテンツに出し、appearCancelledを関連するコンテンツに出す
+        private void NotifyCancelled()
+        {
+            // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
+            foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
+            {
+                containedUIComponent.DisppearCancelled();
+            }
+
+            // 関連コンテンツが存在すれば引っ張られているはずなのでappearCancelを伝える
+            if (CornerFromLeft != null)
+            {
+                foreach (var containedUIComponent in CornerFromLeft.GetComponentsInChildren<ICornerContent>())
+                {
+                    containedUIComponent.AppearCancelled();
+                }
+            }
+
+            if (CornerFromRight != null)
+            {
+                foreach (var containedUIComponent in CornerFromRight.GetComponentsInChildren<ICornerContent>())
+                {
+                    containedUIComponent.AppearCancelled();
+                }
+            }
+
+
+            if (CornerFromBottom != null)
+            {
+                foreach (var containedUIComponent in CornerFromBottom.GetComponentsInChildren<ICornerContent>())
+                {
+                    containedUIComponent.AppearCancelled();
+                }
+            }
+
+            if (CornerFromTop != null)
+            {
+                foreach (var containedUIComponent in CornerFromTop.GetComponentsInChildren<ICornerContent>())
+                {
+                    containedUIComponent.AppearCancelled();
+                }
+            }
+        }
+
+        // didDisappearを自身のコンテンツに出し、didAppearを関連する方向のコンテンツに出す
+        private void NotifyProcessed(FlickDirection resultDir)
+        {
+            // 自身の持っているcontentsに対応のものがあればdisappearを伝える
+            foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
+            {
+                containedUIComponent.DidDisappear();
+            }
+
+            // 関連コンテンツがあればappearを伝える
+            switch (resultDir)
+            {
+                case FlickDirection.RIGHT:
+                    if (CornerFromLeft != null)
+                    {
+                        foreach (var containedUIComponent in CornerFromLeft.GetComponentsInChildren<ICornerContent>())
+                        {
+                            containedUIComponent.DidAppear();
+                        }
+                    }
+                    break;
+                case FlickDirection.LEFT:
+                    if (CornerFromRight != null)
+                    {
+                        foreach (var containedUIComponent in CornerFromRight.GetComponentsInChildren<ICornerContent>())
+                        {
+                            containedUIComponent.DidAppear();
+                        }
+                    }
+                    break;
+
+                case FlickDirection.UP:
+                    if (CornerFromBottom != null)
+                    {
+                        foreach (var containedUIComponent in CornerFromBottom.GetComponentsInChildren<ICornerContent>())
+                        {
+                            containedUIComponent.DidAppear();
+                        }
+                    }
+                    break;
+
+                case FlickDirection.DOWN:
+                    if (CornerFromTop != null)
+                    {
+                        foreach (var containedUIComponent in CornerFromTop.GetComponentsInChildren<ICornerContent>())
+                        {
+                            containedUIComponent.DidAppear();
+                        }
+                    }
+                    break;
+                default:
+                    Debug.LogError("unhandled dir:" + resultDir);
+                    break;
+            }
+        }
+
+        private FlickDirection DetectFlickingDirection(Vector2 delta)
+        {
+            if (0 < delta.x)
+            {
+                return FlickDirection.RIGHT;
+            }
+            else if (delta.x < 0)
+            {
+                return FlickDirection.LEFT;
+            }
+            else if (0 < delta.y)
+            {
+                return FlickDirection.UP;
+            }
+            else if (delta.y < 0)
+            {
+                return FlickDirection.DOWN;
+            }
+
+            return FlickDirection.NONE;
         }
 
         // 移動可能な方向を返す
@@ -497,7 +738,7 @@ namespace GamenChangerCore
             }
         }
 
-        // 結果的にどちらの方向にflick下かで、自身と各コーナーの位置を最終目的地へとセットする
+        // 結果的にどちらの方向にflickしたかで、自身と各コーナーの位置を最終目的地へとセットする
         private void SetToTargetPosition(FlickDirection resultDir)
         {
             // flickDir で変化させるが、まあどっちに向かっているかで最終値が違う。
@@ -647,12 +888,14 @@ namespace GamenChangerCore
         }
 
 
-        private void UpdateProgress()
+        private void UpdateProgress(FlickDirection currentMovedDirection)
         {
-            // 横方向
-            {
-                var xDist = initalPos.x - currentRectTransform.anchoredPosition.x;
+            var xDist = initalPos.x - currentRectTransform.anchoredPosition.x;
+            var yDist = initalPos.y - currentRectTransform.anchoredPosition.y;
 
+            // 横方向
+            if (xDist != 0)
+            {
                 var progress = Mathf.Abs(xDist) / reactUnitSize;
 
                 var appearProgress = Mathf.Min(1f, progress);
@@ -665,27 +908,32 @@ namespace GamenChangerCore
                 }
 
                 // これから表示される要素のcontentsにappearProgressを伝える
-                switch (flickDir)
+                switch (currentMovedDirection)
                 {
                     case FlickDirection.RIGHT:
-                        foreach (var containedUIComponent in CornerFromLeft.GetComponentsInChildren<ICornerContent>())
+                        if (CornerFromLeft != null)
                         {
-                            containedUIComponent.AppearProgress(appearProgress);
+                            foreach (var containedUIComponent in CornerFromLeft.GetComponentsInChildren<ICornerContent>())
+                            {
+                                containedUIComponent.AppearProgress(appearProgress);
+                            }
                         }
                         break;
                     case FlickDirection.LEFT:
-                        foreach (var containedUIComponent in CornerFromRight.GetComponentsInChildren<ICornerContent>())
+                        if (CornerFromRight != null)
                         {
-                            containedUIComponent.AppearProgress(appearProgress);
+                            foreach (var containedUIComponent in CornerFromRight.GetComponentsInChildren<ICornerContent>())
+                            {
+                                containedUIComponent.AppearProgress(appearProgress);
+                            }
                         }
                         break;
                 }
             }
 
             // 縦方向
+            if (yDist != 0)
             {
-                var yDist = initalPos.y - currentRectTransform.anchoredPosition.y;
-
                 var progress = Mathf.Abs(yDist) / reactUnitSize;
 
                 var appearProgress = Mathf.Min(1f, progress);
@@ -698,18 +946,24 @@ namespace GamenChangerCore
                 }
 
                 // これから表示される要素のcontentsにappearProgressを伝える
-                switch (flickDir)
+                switch (currentMovedDirection)
                 {
                     case FlickDirection.UP:
-                        foreach (var containedUIComponent in CornerFromTop.GetComponentsInChildren<ICornerContent>())
+                        if (CornerFromBottom != null)
                         {
-                            containedUIComponent.AppearProgress(appearProgress);
+                            foreach (var containedUIComponent in CornerFromBottom.GetComponentsInChildren<ICornerContent>())
+                            {
+                                containedUIComponent.AppearProgress(appearProgress);
+                            }
                         }
                         break;
                     case FlickDirection.DOWN:
-                        foreach (var containedUIComponent in CornerFromBottom.GetComponentsInChildren<ICornerContent>())
+                        if (CornerFromTop != null)
                         {
-                            containedUIComponent.AppearProgress(appearProgress);
+                            foreach (var containedUIComponent in CornerFromTop.GetComponentsInChildren<ICornerContent>())
+                            {
+                                containedUIComponent.AppearProgress(appearProgress);
+                            }
                         }
                         break;
                 }
@@ -814,14 +1068,14 @@ namespace GamenChangerCore
         }
 
         // デバッグ用
-        // private void Show(string title, params (string key, object param)[] p)
-        // {
-        //     var str = "title:" + title + "\n";
-        //     foreach (var pi in p)
-        //     {
-        //         str += "    " + pi.key + ":" + pi.param + ", \n";
-        //     }
-        //     Debug.Log(str);
-        // }
+        private void Show(string title, params (string key, object param)[] p)
+        {
+            var str = "title:" + title + "\n";
+            foreach (var pi in p)
+            {
+                str += "    " + pi.key + ":" + pi.param + ", \n";
+            }
+            Debug.Log(str);
+        }
     }
 }
