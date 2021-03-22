@@ -24,7 +24,6 @@ namespace GamenChangerCore
         private FlickDirection flickDir;
         private Vector2 initalPos;
 
-
         // 開始条件を判定するイベント
         public void OnPointerEnter(PointerEventData eventData)
         {
@@ -793,7 +792,7 @@ namespace GamenChangerCore
                 CornerFromLeft.currentRectTransform.anchoredPosition = cornerFromLeftInitialPos + moveByUnitSizeVec;
                 if (CornerFromLeft is FlickableCorner)
                 {
-                    ((FlickableCorner)CornerFromLeft).UpdateRelatedCornerPositions(this, resultDir, moveByUnitSizeVec);
+                    ((FlickableCorner)CornerFromLeft).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
                 }
             }
             if (CornerFromRight != null)
@@ -801,7 +800,7 @@ namespace GamenChangerCore
                 CornerFromRight.currentRectTransform.anchoredPosition = cornerFromRightInitialPos + moveByUnitSizeVec;
                 if (CornerFromRight is FlickableCorner)
                 {
-                    ((FlickableCorner)CornerFromRight).UpdateRelatedCornerPositions(this, resultDir, moveByUnitSizeVec);
+                    ((FlickableCorner)CornerFromRight).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
                 }
             }
             if (CornerFromTop != null)
@@ -809,7 +808,7 @@ namespace GamenChangerCore
                 CornerFromTop.currentRectTransform.anchoredPosition = cornerFromTopInitialPos + moveByUnitSizeVec;
                 if (CornerFromTop is FlickableCorner)
                 {
-                    ((FlickableCorner)CornerFromTop).UpdateRelatedCornerPositions(this, resultDir, moveByUnitSizeVec);
+                    ((FlickableCorner)CornerFromTop).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
                 }
             }
             if (CornerFromBottom != null)
@@ -817,7 +816,7 @@ namespace GamenChangerCore
                 CornerFromBottom.currentRectTransform.anchoredPosition = cornerFromBottomInitialPos + moveByUnitSizeVec;
                 if (CornerFromBottom is FlickableCorner)
                 {
-                    ((FlickableCorner)CornerFromBottom).UpdateRelatedCornerPositions(this, resultDir, moveByUnitSizeVec);
+                    ((FlickableCorner)CornerFromBottom).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
                 }
             }
         }
@@ -1025,70 +1024,43 @@ namespace GamenChangerCore
             return FlickDirection.NONE;
         }
 
-        private void UpdateRelatedCornerPositions(FlickableCorner flickedSource, FlickDirection relatedFlickCornerFlickedDir, Vector2 movedVector)
+        private void UpdateRelatedCornerPositions(FlickableCorner flickedSource, Vector2 movedVector)
         {
-            switch (relatedFlickCornerFlickedDir)
+            // 関連するCornerの要素も連鎖させて移動させる。呼び出し元のオブジェクトと同じオブジェクトはすでに移動済なので移動させない。
+            if (CornerFromRight != null && CornerFromRight != flickedSource)
             {
-                case FlickDirection.RIGHT:
-                    // 右方向へのフリックが完了したので、このコンテンツは左端から出現させられた。そのため、上下と左のコンテンツの位置を変更する。
-                    if (CornerFromLeft != null && CornerFromLeft != flickedSource)
-                    {
-                        CornerFromLeft.currentRectTransform.anchoredPosition = CornerFromLeft.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    if (CornerFromTop != null && CornerFromTop != flickedSource)
-                    {
-                        CornerFromTop.currentRectTransform.anchoredPosition = CornerFromTop.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    if (CornerFromBottom != null && CornerFromBottom != flickedSource)
-                    {
-                        CornerFromBottom.currentRectTransform.anchoredPosition = CornerFromBottom.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    break;
-                case FlickDirection.LEFT:
-                    // 左方向へのフリックが完了したので、このコンテンツは右端から出現させられた。そのため、上下と右のコンテンツの位置を変更する。
-                    if (CornerFromRight != null && CornerFromRight != flickedSource)
-                    {
-                        CornerFromRight.currentRectTransform.anchoredPosition = CornerFromRight.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    if (CornerFromTop != null && CornerFromTop != flickedSource)
-                    {
-                        CornerFromTop.currentRectTransform.anchoredPosition = CornerFromTop.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    if (CornerFromBottom != null && CornerFromBottom != flickedSource)
-                    {
-                        CornerFromBottom.currentRectTransform.anchoredPosition = CornerFromBottom.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    break;
-                case FlickDirection.UP:
-                    // 上方向へのフリックが完了したので、このコンテンツは下端から出現させられた。そのため、下と左右のコンテンツの位置を変更する。
-                    if (CornerFromLeft != null && CornerFromLeft != flickedSource)
-                    {
-                        CornerFromLeft.currentRectTransform.anchoredPosition = CornerFromLeft.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    if (CornerFromRight != null && CornerFromRight != flickedSource)
-                    {
-                        CornerFromRight.currentRectTransform.anchoredPosition = CornerFromRight.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    if (CornerFromBottom != null && CornerFromBottom != flickedSource)
-                    {
-                        CornerFromBottom.currentRectTransform.anchoredPosition = CornerFromBottom.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    break;
-                case FlickDirection.DOWN:
-                    // 下方向へのフリックが完了したので、このコンテンツは上端から出現させられた。そのため、上と左右のコンテンツの位置を変更する。
-                    if (CornerFromLeft != null && CornerFromLeft != flickedSource)
-                    {
-                        CornerFromLeft.currentRectTransform.anchoredPosition = CornerFromLeft.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    if (CornerFromRight != null && CornerFromRight != flickedSource)
-                    {
-                        CornerFromRight.currentRectTransform.anchoredPosition = CornerFromRight.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    if (CornerFromTop != null && CornerFromTop != flickedSource)
-                    {
-                        CornerFromTop.currentRectTransform.anchoredPosition = CornerFromTop.currentRectTransform.anchoredPosition + movedVector;
-                    }
-                    break;
+                CornerFromRight.currentRectTransform.anchoredPosition = CornerFromRight.currentRectTransform.anchoredPosition + movedVector;
+                if (CornerFromRight is FlickableCorner)
+                {
+                    ((FlickableCorner)CornerFromRight).UpdateRelatedCornerPositions(this, movedVector);
+                }
+            }
+
+            if (CornerFromLeft != null && CornerFromLeft != flickedSource)
+            {
+                CornerFromLeft.currentRectTransform.anchoredPosition = CornerFromLeft.currentRectTransform.anchoredPosition + movedVector;
+                if (CornerFromLeft is FlickableCorner)
+                {
+                    ((FlickableCorner)CornerFromLeft).UpdateRelatedCornerPositions(this, movedVector);
+                }
+            }
+
+            if (CornerFromTop != null && CornerFromTop != flickedSource)
+            {
+                CornerFromTop.currentRectTransform.anchoredPosition = CornerFromTop.currentRectTransform.anchoredPosition + movedVector;
+                if (CornerFromTop is FlickableCorner)
+                {
+                    ((FlickableCorner)CornerFromTop).UpdateRelatedCornerPositions(this, movedVector);
+                }
+            }
+
+            if (CornerFromBottom != null && CornerFromBottom != flickedSource)
+            {
+                CornerFromBottom.currentRectTransform.anchoredPosition = CornerFromBottom.currentRectTransform.anchoredPosition + movedVector;
+                if (CornerFromBottom is FlickableCorner)
+                {
+                    ((FlickableCorner)CornerFromBottom).UpdateRelatedCornerPositions(this, movedVector);
+                }
             }
         }
 
