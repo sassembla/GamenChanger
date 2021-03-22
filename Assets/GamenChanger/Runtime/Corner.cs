@@ -7,9 +7,10 @@ namespace GamenChangerCore
     /*
         基底のコーナー、単なる集合の箱。
         コーナーの内容を挿げ替える -> できた
-        TODO: フリック可能にしてみるか。
+        フリック可能にしてみる -> できた
+        TODO: OneOfNを作ってみる
     */
-    public class Corner : MonoBehaviour// TODO: MBつけたくないんだけど、つける方がUnityに干渉するルートが目に見えるしHierarchyに置けるので楽
+    public class Corner : MonoBehaviour
     {
         [HideInInspector] public RectTransform[] containedUIComponents;
 

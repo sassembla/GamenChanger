@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -24,7 +23,7 @@ namespace GamenChangerCore
         private FlickDirection flickDir;
         private Vector2 initalPos;
 
-        private IFlickableCornerFocusHandler[] parentHandlers = new IFlickableCornerFocusHandler[0];
+        private IFlickableCornerHandler[] parentHandlers = new IFlickableCornerHandler[0];
 
         public new void Awake()
         {
@@ -33,7 +32,7 @@ namespace GamenChangerCore
             // 親を探して、IFlickableCornerFocusHandlerを持っているオブジェクトがあったら、変更があるたびに上流に通知を流す。
             if (transform.parent != null)
             {
-                parentHandlers = transform.parent.GetComponentsInParent<IFlickableCornerFocusHandler>();
+                parentHandlers = transform.parent.GetComponentsInParent<IFlickableCornerHandler>();
             }
         }
 
@@ -429,16 +428,6 @@ namespace GamenChangerCore
             // Debug.Log("フリックを終了する dir:" + dir);
         }
 
-
-        private enum FlickDirection
-        {
-            NONE = 0,
-            UP = 0x001,
-            RIGHT = 0x002,
-            DOWN = 0x004,
-            LEFT = 0x008
-        }
-
         // willDisappearを自身のコンテンツに出し、willAppearを関連する方向のコンテンツに出す
         private void NotifyAppearance(Vector2 delta)
         {
@@ -632,6 +621,14 @@ namespace GamenChangerCore
         // 移動可能な方向を返す
         private FlickDirection GetAvailableDirection(Vector2 deltaMove)
         {
+            var estimatedFlickDir = EstimateFlickDir(deltaMove);
+
+            // 上位のハンドラがあれば追加する方向のリクエストを行う
+            foreach (var parentHandler in parentHandlers)
+            {
+                parentHandler.OnFlickRequestFromFlickableCorner(this, ref CornerFromLeft, ref CornerFromRight, ref CornerFromTop, ref CornerFromBottom, estimatedFlickDir);
+            }
+
             // ここで、deltaMoveの値に応じて実際に利用できる方向の判定を行い、移動可能な方向を限定して返す。
 
             var dir = FlickDirection.NONE;
@@ -706,6 +703,29 @@ namespace GamenChangerCore
             return dir;
         }
 
+        // 初期フリック方向を見積もる
+        // 右 -> 左 -> 下 -> 上 の順に判定している。
+        private FlickDirection EstimateFlickDir(Vector2 delta)
+        {
+            if (0 < delta.x)// 右に行こうとしている = 右フリック
+            {
+                return FlickDirection.RIGHT;
+            }
+            else if (delta.x < 0)
+            {
+                return FlickDirection.LEFT;
+            }
+            else if (delta.y < 0)
+            {
+                return FlickDirection.DOWN;
+            }
+            else if (0 < delta.y)
+            {
+                return FlickDirection.UP;
+            }
+
+            return FlickDirection.NONE;
+        }
 
 
         // dirを元に、移動できる方向を制限する。
