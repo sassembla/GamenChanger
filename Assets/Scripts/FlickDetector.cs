@@ -52,6 +52,7 @@ public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
     // フリックの開始時にリクエストを検知し、ビューの建て増しと削除が可能になる。
     public void OnFlickRequestFromFlickableCorner(FlickableCorner flickableCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir)
     {
+        return;
         // leftが空なFlickableCornerに対して右フリックをした際、左側にコンテンツを偽造する
         if (plannedFlickDir == FlickDirection.RIGHT && cornerFromLeft == null)
         {
