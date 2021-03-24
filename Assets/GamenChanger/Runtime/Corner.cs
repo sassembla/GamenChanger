@@ -19,6 +19,11 @@ namespace GamenChangerCore
         // 生成時にコンテンツを収集する。
         public void Awake()
         {
+            InitailizeCorner();
+        }
+
+        private void InitailizeCorner()
+        {
             // UIを収集する
             var childCount = transform.childCount;
             var childUIComponent = new List<RectTransform>();
@@ -42,9 +47,9 @@ namespace GamenChangerCore
             currentRectTransform = gameObject.GetComponent<RectTransform>();
         }
 
+        private Corner originCorner;
         // 内容物を書き換える
-        // TODO: これを使ったタブ型のサンプルを作ろう。
-        public void SwapContents(Corner corner)
+        public void BorrowContents(Corner corner)
         {
             // 中身を消す
             var childCount = transform.childCount;
@@ -66,6 +71,18 @@ namespace GamenChangerCore
                 content.anchoredPosition += diff;
                 var trans = content.transform;
                 trans.SetParent(this.transform);
+            }
+
+            originCorner = corner;
+            InitailizeCorner();
+        }
+
+        public void BackContents()
+        {
+            if (originCorner != null)
+            {
+                originCorner.BorrowContents(this);
+                originCorner = null;
             }
         }
 

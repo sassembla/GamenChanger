@@ -1,5 +1,6 @@
 ﻿using GamenChangerCore;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
 {
@@ -20,6 +21,11 @@ public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
     public void AppearCancelled(FlickableCorner flickableCorner)
     {
         Debug.Log("AppearCancelled:" + flickableCorner);
+        if (flickableCorner.gameObject.name.Contains("FrickableCornerPrefab"))
+        {
+            // prefabから作ったやつだったら消す
+            Destroy(flickableCorner.gameObject);
+        }
     }
     public void AppearProgress(FlickableCorner flickableCorner, float progress)
     {
@@ -49,10 +55,12 @@ public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
         Debug.Log("DisppearProgress:" + flickableCorner + " progress:" + progress);
     }
 
+
+    private int count = 0;
     // フリックの開始時にリクエストを検知し、ビューの建て増しと削除が可能になる。
     public void OnFlickRequestFromFlickableCorner(FlickableCorner flickableCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir)
     {
-        return;
+        Debug.Log("OnFlickRequestFromFlickableCorner");
         // leftが空なFlickableCornerに対して右フリックをした際、左側にコンテンツを偽造する
         if (plannedFlickDir == FlickDirection.RIGHT && cornerFromLeft == null)
         {
@@ -64,6 +72,15 @@ public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
 
             newCorner.CornerFromRight = flickableCorner;
             cornerFromLeft = newCorner;
+            count++;
+
+            // ボタンにカウント表示をセットする
+            var button = newCorner.ExposureContents()[0].GetComponent<Button>();
+            if (button != null)
+            {
+                var text = button.GetComponentInChildren<Text>();
+                text.text = text.text + ":" + count;
+            }
             return;
         }
 
@@ -78,6 +95,15 @@ public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
 
             newCorner.CornerFromLeft = flickableCorner;
             cornerFromRight = newCorner;
+            count++;
+
+            // ボタンにカウント表示をセットする
+            var button = newCorner.ExposureContents()[0].GetComponent<Button>();
+            if (button != null)
+            {
+                var text = button.GetComponentInChildren<Text>();
+                text.text = text.text + ":" + count;
+            }
             return;
         }
     }

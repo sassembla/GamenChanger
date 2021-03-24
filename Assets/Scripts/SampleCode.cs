@@ -14,7 +14,7 @@ public class SampleCode : MonoBehaviour
 
         var fromCorner = GameObject.Find("FromCorner").GetComponent<Corner>();
         var toCorner = GameObject.Find("ToCorner").GetComponent<Corner>();
-        fromCorner.SwapContents(toCorner);
+        fromCorner.BorrowContents(toCorner);
 
 
 

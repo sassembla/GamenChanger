@@ -6,6 +6,7 @@ namespace GamenChangerCore
 {
     /*
         フリック可能なCorner
+        // TODO: 対象となるhandlerを見つけてinspectorに表示したい感じある。
     */
     public class FlickableCorner : Corner, IDragHandler, IEndDragHandler, IInitializePotentialDragHandler, IBeginDragHandler, IPointerEnterHandler
     {
