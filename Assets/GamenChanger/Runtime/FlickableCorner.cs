@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -1129,6 +1130,128 @@ namespace GamenChangerCore
                     ((FlickableCorner)CornerFromBottom).UpdateRelatedCornerPositions(this, movedVector);
                 }
             }
+        }
+
+        // fromからtoへとつながる経路探索を行う
+        public static (bool isFound, IEnumerator animation) TryFindingAutoFlickRoute(FlickableCorner from, FlickableCorner to)
+        {
+            // 接続されていれば、経路が見つかってステップが返せるはず。
+            if (IsConnected(from, to, out var direction, out var steps))
+            {
+                // TODO: アニメーションの自動化、Driverを作る必要がある。まあ作るんだが。
+                // Flickableに対して、特定の方向に、特定のペースで進む機構っていうのを作る。
+                var driver = new GamenDriver(steps);
+
+                IEnumerator animation()
+                {
+                    while (driver.MoveNext())
+                    {
+                        yield return null;
+                    }
+                };
+
+                return (true, animation());
+            }
+
+            return (false, null);
+        }
+
+        // FlickableCorner同士の上下左右の接続を見て、接続があればtrueを返す。
+        private static bool IsConnected(FlickableCorner from, FlickableCorner to, out FlickDirection direction, out Corner[] route)
+        {
+            // 同一の親の下にいない場合、接続されていない。
+            if (from.transform.parent != to.transform.parent)
+            {
+                direction = FlickDirection.NONE;
+                route = null;
+                return false;
+            }
+
+            // TODO: ななめは勘弁してほしい(なんかロジックあるだろうけど正直そんなキモいUIをサポートしたくない、、、)
+            // fromからtoへと、接続があるかどうか探す。
+            if (SearchStart(FlickDirection.LEFT, from, to, out var stepsToRight))
+            {
+                direction = FlickDirection.LEFT;
+                route = stepsToRight.ToArray();
+                return true;
+            }
+            if (SearchStart(FlickDirection.RIGHT, from, to, out var stepsToLeft))
+            {
+                direction = FlickDirection.RIGHT;
+                route = stepsToLeft.ToArray();
+                return true;
+            }
+            if (SearchStart(FlickDirection.UP, from, to, out var stepsToDown))
+            {
+                direction = FlickDirection.UP;
+                route = stepsToDown.ToArray();
+                return true;
+            }
+            if (SearchStart(FlickDirection.DOWN, from, to, out var stepsToUp))
+            {
+                direction = FlickDirection.DOWN;
+                route = stepsToUp.ToArray();
+                return true;
+            }
+
+            direction = FlickDirection.NONE;
+            route = null;
+            return false;
+        }
+
+        private static bool SearchStart(FlickDirection dir, FlickableCorner current, FlickableCorner target, out List<Corner> steps)
+        {
+            steps = new List<Corner>();
+
+            // 起点の情報を追加
+            steps.Add(current);
+            if (Search(dir, current, target, ref steps))
+            {
+                // 終点の情報を追加
+                steps.Add(target);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool Search(FlickDirection dir, FlickableCorner current, FlickableCorner target, ref List<Corner> steps)
+        {
+            Corner directedCorner = null;
+            switch (dir)
+            {
+                case FlickDirection.LEFT:
+                    directedCorner = current.CornerFromRight;
+                    break;
+                case FlickDirection.RIGHT:
+                    directedCorner = current.CornerFromLeft;
+                    break;
+                case FlickDirection.UP:
+                    directedCorner = current.CornerFromBottom;
+                    break;
+                case FlickDirection.DOWN:
+                    directedCorner = current.CornerFromTop;
+                    break;
+            }
+
+            if (directedCorner != null)
+            {
+                // その方向にあったのがターゲットだった
+                if (directedCorner == target)
+                {
+                    return true;
+                }
+
+                if (directedCorner is FlickableCorner)
+                {
+                    // 違ったが、続きがある可能性があるため、ここまでのステップを記録する。
+                    steps.Add(directedCorner);
+                    return Search(dir, (FlickableCorner)directedCorner, target, ref steps);
+                }
+            }
+
+            steps = null;
+            return false;
         }
 
         // デバッグ用

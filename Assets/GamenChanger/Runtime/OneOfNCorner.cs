@@ -52,6 +52,7 @@ namespace GamenChangerCore
                 return;
             }
 
+            // non nullなのを確認した上でセットする
             listener = listenerCandidate;
 
             // baseの初期化時に実行する関数としてこのクラスの初期化処理をセット
@@ -92,13 +93,69 @@ namespace GamenChangerCore
                 return;
             }
 
+            var before = One;
+
             // Oneの更新
             One = currentReactedObject;
 
             var whole = ExposureAllContents();
 
             // 親のOnChangedを着火する
-            listener.OnChangedToOne(One, whole.Select(t => t.gameObject).ToArray());
+            listener.OnChangedToOne(One, before, whole.Select(t => t.gameObject).ToArray());
+        }
+
+        // UIを操作した副作用をlistenerに解析させ、OneOfNに反映させる
+        public void SelectOneWithCorner(Corner corner)
+        {
+            var whole = ExposureAllContents().Select(s => s.gameObject).ToArray();
+            var newOne = listener.OnSelectOneOfNFromCodeWithCorner(corner, whole);
+
+            // nullが帰ってきたら無視する。
+            if (newOne == null)
+            {
+                return;
+            }
+
+            // すでに同じオブジェクトが押された後であれば無視する
+            if (newOne == One)
+            {
+                return;
+            }
+
+            var before = One;
+
+            // Oneの更新
+            One = newOne;
+
+            // 親のOnChangedを着火する
+            listener.OnChangedToOne(One, before, whole);
+        }
+
+        // このOneOfNが含んでいるRectTransformを指定してOneを更新する。
+        public void SelectOneWithContent(RectTransform contentInOneOfN)
+        {
+            if (!ExposureAllContents().Contains(contentInOneOfN))
+            {
+                return;
+            }
+
+            var newOne = contentInOneOfN.gameObject;
+
+            // すでに同じオブジェクトが押された後であれば無視する
+            if (newOne == One)
+            {
+                return;
+            }
+
+            var before = One;
+
+            // Oneの更新
+            One = newOne;
+
+            var whole = ExposureAllContents().Select(s => s.gameObject).ToArray();
+
+            // 親のOnChangedを着火する
+            listener.OnChangedToOne(One, before, whole);
         }
     }
 }

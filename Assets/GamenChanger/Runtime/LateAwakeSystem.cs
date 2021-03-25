@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 using UnityEngine.LowLevel;
 
 namespace GamenChangerCore
@@ -16,10 +17,17 @@ namespace GamenChangerCore
 
             while (true)
             {
-                var uninitialize = uninitialized[0];
-                if (uninitialize != null)
+                try
                 {
-                    uninitialize.ReloadCorner();
+                    var uninitialize = uninitialized[0];
+                    if (uninitialize != null)
+                    {
+                        uninitialize.ReloadCorner();
+                    }
+                }
+                catch
+                {
+                    Debug.LogError("failed to execute ReloadCorner of:" + uninitialized[0]);
                 }
 
                 uninitialized.RemoveAt(0);

@@ -1,4 +1,3 @@
-using System;
 using GamenChangerCore;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,20 +10,37 @@ public class MyOneOfNHandler : MonoBehaviour, IOneOfNCornerHandler
     public Corner corner2nd;
     public Corner corner3rd;
 
-    public Type TreatType()
-    {
-        return typeof(Button);
-    }
-
-    // TODO: ここの型を制約したい訳だが！！ MonoBehaviour型で渡ってきて、castできる、、とかだと嬉しいなあ。typeもパラメータで出してくれれば、、
     public void OnInitialized(GameObject one, GameObject[] all)
     {
-        OnChangedToOne(one, all);
+        // UIの調整
+        foreach (var a in all)
+        {
+            var button = a.GetComponent<Button>();
+            if (a == one)
+            {
+                button.interactable = false;
+                continue;
+            }
+            button.interactable = true;
+        }
     }
 
-    public void OnChangedToOne(GameObject one, GameObject[] all)
+    public void OnChangedToOne(GameObject one, GameObject before, GameObject[] all)
     {
-        Debug.Log("OnChangedToOne:" + one + " cornerの内容をbutton textとかに合わせて変える");
+        // UIの調整
+        foreach (var a in all)
+        {
+            var button = a.GetComponent<Button>();
+            if (a == one)
+            {
+                button.interactable = false;
+                continue;
+            }
+            button.interactable = true;
+        }
+
+        // oneの好きなパラメータで内容を変更する
+        // TODO: とはいえstringは最悪なので、何かしらこのへんも宣言的にしたいところ。indexとか？ oneOfNみたいな概念でラップすればつけられるな。ただ結局どう並ぶかの法則を知らないと困る。
         switch (one.name)
         {
             case "Button1":
@@ -43,5 +59,10 @@ public class MyOneOfNHandler : MonoBehaviour, IOneOfNCornerHandler
                 Debug.LogError("unhandled name:" + one.gameObject.name);
                 break;
         }
+    }
+
+    public GameObject OnSelectOneOfNFromCodeWithCorner(Corner choosedCorner, GameObject[] all)
+    {
+        return null;
     }
 }

@@ -1,4 +1,5 @@
-﻿using GamenChangerCore;
+﻿using System;
+using GamenChangerCore;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,6 +7,7 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
 {
     public GameObject FlickableCornerPrefab;
     public OneOfNCorner IndicatorCorner;
+
 
     /*
         flickableCornerに対して、flick操作に応じて関連するcornerの出現や消滅、progressを取得することができる。
@@ -19,8 +21,29 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
     public void DidAppear(FlickableCorner flickableCorner)
     {
         Debug.Log("DidAppear:" + flickableCorner);
-        // IndicatorCorner.
+        // IndicatorCorner.SelectOneWithCorner(flickableCorner);
+
+        var contents = IndicatorCorner.ExposureAllContents();
+        switch (flickableCorner.name)
+        {
+            case "FrickableCorner1":
+                IndicatorCorner.SelectOneWithContent(contents[0]);
+                break;
+            case "FrickableCorner2":
+                IndicatorCorner.SelectOneWithContent(contents[1]);
+                break;
+            case "FrickableCorner3":
+                IndicatorCorner.SelectOneWithContent(contents[2]);
+                break;
+            case "FrickableCorner4":
+                IndicatorCorner.SelectOneWithContent(contents[3]);
+                break;
+            default:
+                Debug.LogError("unhandled corner:" + flickableCorner.name);
+                break;
+        }
     }
+
     public void AppearCancelled(FlickableCorner flickableCorner)
     {
         Debug.Log("AppearCancelled:" + flickableCorner);

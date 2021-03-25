@@ -197,7 +197,7 @@ namespace GamenChangerCore
         }
 
         // Cornerが保持しているコンテンツから、特定のUI型がついているUI Componentの集合を取得する。
-        public bool TryExposureContents<T>(out T[] rectTransforms) where T : UIBehaviour
+        public bool TryExposureContents<T>(out T[] contents) where T : UIBehaviour
         {
             var rectTransformsList = new List<T>();
 
@@ -212,11 +212,34 @@ namespace GamenChangerCore
 
             if (rectTransformsList.Any())
             {
-                rectTransforms = rectTransformsList.ToArray();
+                contents = rectTransformsList.ToArray();
                 return true;
             }
 
-            rectTransforms = null;
+            contents = null;
+            return false;
+        }
+
+        public bool TryExposureCorners<T>(out T[] corners) where T : Corner
+        {
+            var cornerList = new List<T>();
+
+            ReloadContainedComponent();
+            foreach (var containedUIComponent in containedUIComponents)
+            {
+                if (containedUIComponent.TryGetComponent<T>(out var component))
+                {
+                    cornerList.Add(component);
+                }
+            }
+
+            if (cornerList.Any())
+            {
+                corners = cornerList.ToArray();
+                return true;
+            }
+
+            corners = null;
             return false;
         }
     }
