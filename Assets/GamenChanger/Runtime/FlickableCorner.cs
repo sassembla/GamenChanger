@@ -28,13 +28,18 @@ namespace GamenChangerCore
 
         public new void Awake()
         {
-            base.Awake();
+            base.SetSubclassReloadAction(
+                () =>
+                {
+                    // 親を探して、IFlickableCornerFocusHandlerを持っているオブジェクトがあったら、変更があるたびに上流に通知を流す。
+                    if (transform.parent != null)
+                    {
+                        parentHandlers = transform.parent.GetComponents<IFlickableCornerHandler>();
+                    }
+                }
+            );
 
-            // 親を探して、IFlickableCornerFocusHandlerを持っているオブジェクトがあったら、変更があるたびに上流に通知を流す。
-            if (transform.parent != null)
-            {
-                parentHandlers = transform.parent.GetComponentsInParent<IFlickableCornerHandler>();
-            }
+            base.Awake();
         }
 
         // 開始条件を判定するイベント
@@ -50,7 +55,7 @@ namespace GamenChangerCore
 
             if (eventData.eligibleForClick && eventData.pointerEnter == this.gameObject && !touchInScreen)
             {
-                // TODO: これで画面外からのフリックを無理矢理開始することができるようになったが、そもそも実機でどうなのか、というのをチェックすべき。実機でどうなのっていう感じだなー
+                // 実機でも動作する、このオブジェクトをdrag中にできる方法。
                 eventData.pointerDrag = this.gameObject;
                 OnInitializePotentialDrag(eventData);
                 return;
@@ -768,46 +773,46 @@ namespace GamenChangerCore
         // 自身と各コーナーの初期位置を更新する
         private void UpdateInitialPos()
         {
-            initalPos = currentRectTransform.anchoredPosition;
+            initalPos = currentRectTransform().anchoredPosition;
 
             if (CornerFromLeft != null)
             {
-                cornerFromLeftInitialPos = CornerFromLeft.currentRectTransform.anchoredPosition;
+                cornerFromLeftInitialPos = CornerFromLeft.currentRectTransform().anchoredPosition;
             }
             if (CornerFromRight != null)
             {
-                cornerFromRightInitialPos = CornerFromRight.currentRectTransform.anchoredPosition;
+                cornerFromRightInitialPos = CornerFromRight.currentRectTransform().anchoredPosition;
             }
             if (CornerFromTop != null)
             {
-                cornerFromTopInitialPos = CornerFromTop.currentRectTransform.anchoredPosition;
+                cornerFromTopInitialPos = CornerFromTop.currentRectTransform().anchoredPosition;
             }
             if (CornerFromBottom != null)
             {
-                cornerFromBottomInitialPos = CornerFromBottom.currentRectTransform.anchoredPosition;
+                cornerFromBottomInitialPos = CornerFromBottom.currentRectTransform().anchoredPosition;
             }
         }
 
         // 自身と各コーナーの位置を初期位置に戻す
         private void ResetToInitialPosition()
         {
-            currentRectTransform.anchoredPosition = initalPos;
+            currentRectTransform().anchoredPosition = initalPos;
 
             if (CornerFromLeft != null)
             {
-                CornerFromLeft.currentRectTransform.anchoredPosition = cornerFromLeftInitialPos;
+                CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos;
             }
             if (CornerFromRight != null)
             {
-                CornerFromRight.currentRectTransform.anchoredPosition = cornerFromRightInitialPos;
+                CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos;
             }
             if (CornerFromTop != null)
             {
-                CornerFromTop.currentRectTransform.anchoredPosition = cornerFromTopInitialPos;
+                CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos;
             }
             if (CornerFromBottom != null)
             {
-                CornerFromBottom.currentRectTransform.anchoredPosition = cornerFromBottomInitialPos;
+                CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos;
             }
         }
 
@@ -832,13 +837,13 @@ namespace GamenChangerCore
             }
 
             // 自身の位置を確定させる
-            currentRectTransform.anchoredPosition = initalPos + moveByUnitSizeVec;
+            currentRectTransform().anchoredPosition = initalPos + moveByUnitSizeVec;
 
             // 関連cornerの位置を確定させる + 関連コーナーにさらに関連がある場合連動させる。
             // 自身を渡しているのは、関連する要素が保持しているfrom系のcornerがこれ自身な可能性があり、そうすると二重に移動されてしまうのを、自身と対象を比較させて不要な移動だけをキャンセルするため。
             if (CornerFromLeft != null)
             {
-                CornerFromLeft.currentRectTransform.anchoredPosition = cornerFromLeftInitialPos + moveByUnitSizeVec;
+                CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + moveByUnitSizeVec;
                 if (CornerFromLeft is FlickableCorner)
                 {
                     ((FlickableCorner)CornerFromLeft).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
@@ -846,7 +851,7 @@ namespace GamenChangerCore
             }
             if (CornerFromRight != null)
             {
-                CornerFromRight.currentRectTransform.anchoredPosition = cornerFromRightInitialPos + moveByUnitSizeVec;
+                CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + moveByUnitSizeVec;
                 if (CornerFromRight is FlickableCorner)
                 {
                     ((FlickableCorner)CornerFromRight).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
@@ -854,7 +859,7 @@ namespace GamenChangerCore
             }
             if (CornerFromTop != null)
             {
-                CornerFromTop.currentRectTransform.anchoredPosition = cornerFromTopInitialPos + moveByUnitSizeVec;
+                CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + moveByUnitSizeVec;
                 if (CornerFromTop is FlickableCorner)
                 {
                     ((FlickableCorner)CornerFromTop).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
@@ -862,7 +867,7 @@ namespace GamenChangerCore
             }
             if (CornerFromBottom != null)
             {
-                CornerFromBottom.currentRectTransform.anchoredPosition = cornerFromBottomInitialPos + moveByUnitSizeVec;
+                CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + moveByUnitSizeVec;
                 if (CornerFromBottom is FlickableCorner)
                 {
                     ((FlickableCorner)CornerFromBottom).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
@@ -875,32 +880,32 @@ namespace GamenChangerCore
         // TODO: あとそもそもタッチポイントがダイレクトに領域をその動かす対象とするのが気持ち悪いんだよな、、、中間体があったほうがいい気がする。
         private void Move(Vector2 delta)
         {
-            currentRectTransform.anchoredPosition += delta;
+            currentRectTransform().anchoredPosition += delta;
 
-            var diff = currentRectTransform.anchoredPosition - initalPos;
+            var diff = currentRectTransform().anchoredPosition - initalPos;
 
             // 作用を受けるcornerの位置も、上記のdiffをもとに動作させる
             switch (flickDir)
             {
                 case FlickDirection.RIGHT | FlickDirection.LEFT:
-                    CornerFromLeft.currentRectTransform.anchoredPosition = cornerFromLeftInitialPos + diff;
-                    CornerFromRight.currentRectTransform.anchoredPosition = cornerFromRightInitialPos + diff;
+                    CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + diff;
+                    CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + diff;
                     break;
                 case FlickDirection.RIGHT:
-                    CornerFromLeft.currentRectTransform.anchoredPosition = cornerFromLeftInitialPos + diff;
+                    CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + diff;
                     break;
                 case FlickDirection.LEFT:
-                    CornerFromRight.currentRectTransform.anchoredPosition = cornerFromRightInitialPos + diff;
+                    CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + diff;
                     break;
                 case FlickDirection.UP | FlickDirection.DOWN:
-                    CornerFromBottom.currentRectTransform.anchoredPosition = cornerFromBottomInitialPos + diff;
-                    CornerFromTop.currentRectTransform.anchoredPosition = cornerFromTopInitialPos + diff;
+                    CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + diff;
+                    CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + diff;
                     break;
                 case FlickDirection.UP:
-                    CornerFromBottom.currentRectTransform.anchoredPosition = cornerFromBottomInitialPos + diff;
+                    CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + diff;
                     break;
                 case FlickDirection.DOWN:
-                    CornerFromTop.currentRectTransform.anchoredPosition = cornerFromTopInitialPos + diff;
+                    CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + diff;
                     break;
                 default:
                     Debug.LogError("unsupported flickDir:" + flickDir);
@@ -920,17 +925,17 @@ namespace GamenChangerCore
 
                 // 右に向かっていくオンリーのフリック
                 case FlickDirection.RIGHT:
-                    if (currentRectTransform.anchoredPosition.x < initalPos.x)
+                    if (currentRectTransform().anchoredPosition.x < initalPos.x)
                     {
-                        currentRectTransform.anchoredPosition = new Vector2(initalPos.x, currentRectTransform.anchoredPosition.y);
+                        currentRectTransform().anchoredPosition = new Vector2(initalPos.x, currentRectTransform().anchoredPosition.y);
                     }
                     break;
 
                 // 左に向かっていくオンリーのフリック
                 case FlickDirection.LEFT:
-                    if (initalPos.x < currentRectTransform.anchoredPosition.x)
+                    if (initalPos.x < currentRectTransform().anchoredPosition.x)
                     {
-                        currentRectTransform.anchoredPosition = new Vector2(initalPos.x, currentRectTransform.anchoredPosition.y);
+                        currentRectTransform().anchoredPosition = new Vector2(initalPos.x, currentRectTransform().anchoredPosition.y);
                     }
                     break;
 
@@ -941,17 +946,17 @@ namespace GamenChangerCore
 
                 // 上に向かっていくオンリーのフリック
                 case FlickDirection.UP:
-                    if (currentRectTransform.anchoredPosition.y < initalPos.y)
+                    if (currentRectTransform().anchoredPosition.y < initalPos.y)
                     {
-                        currentRectTransform.anchoredPosition = new Vector2(currentRectTransform.anchoredPosition.x, initalPos.y);
+                        currentRectTransform().anchoredPosition = new Vector2(currentRectTransform().anchoredPosition.x, initalPos.y);
                     }
                     break;
 
                 // 下に向かっていくオンリーのフリック
                 case FlickDirection.DOWN:
-                    if (initalPos.y < currentRectTransform.anchoredPosition.y)
+                    if (initalPos.y < currentRectTransform().anchoredPosition.y)
                     {
-                        currentRectTransform.anchoredPosition = new Vector2(currentRectTransform.anchoredPosition.x, initalPos.y);
+                        currentRectTransform().anchoredPosition = new Vector2(currentRectTransform().anchoredPosition.x, initalPos.y);
                     }
                     break;
                 default:
@@ -963,8 +968,8 @@ namespace GamenChangerCore
 
         private void UpdateProgress(FlickDirection currentMovedDirection)
         {
-            var xDist = initalPos.x - currentRectTransform.anchoredPosition.x;
-            var yDist = initalPos.y - currentRectTransform.anchoredPosition.y;
+            var xDist = initalPos.x - currentRectTransform().anchoredPosition.x;
+            var yDist = initalPos.y - currentRectTransform().anchoredPosition.y;
 
             // 横方向
             if (xDist != 0)
@@ -1059,8 +1064,8 @@ namespace GamenChangerCore
 
         private FlickDirection DetermineFlickResult()
         {
-            var xDist = initalPos.x - currentRectTransform.anchoredPosition.x;
-            var yDist = initalPos.y - currentRectTransform.anchoredPosition.y;
+            var xDist = initalPos.x - currentRectTransform().anchoredPosition.x;
+            var yDist = initalPos.y - currentRectTransform().anchoredPosition.y;
 
             if (flickDir.HasFlag(FlickDirection.RIGHT) && reactUnitSize <= -xDist)
             {
@@ -1091,7 +1096,7 @@ namespace GamenChangerCore
             // 関連するCornerの要素も連鎖させて移動させる。呼び出し元のオブジェクトと同じオブジェクトはすでに移動済なので移動させない。
             if (CornerFromRight != null && CornerFromRight != flickedSource)
             {
-                CornerFromRight.currentRectTransform.anchoredPosition = CornerFromRight.currentRectTransform.anchoredPosition + movedVector;
+                CornerFromRight.currentRectTransform().anchoredPosition = CornerFromRight.currentRectTransform().anchoredPosition + movedVector;
                 if (CornerFromRight is FlickableCorner)
                 {
                     ((FlickableCorner)CornerFromRight).UpdateRelatedCornerPositions(this, movedVector);
@@ -1100,7 +1105,7 @@ namespace GamenChangerCore
 
             if (CornerFromLeft != null && CornerFromLeft != flickedSource)
             {
-                CornerFromLeft.currentRectTransform.anchoredPosition = CornerFromLeft.currentRectTransform.anchoredPosition + movedVector;
+                CornerFromLeft.currentRectTransform().anchoredPosition = CornerFromLeft.currentRectTransform().anchoredPosition + movedVector;
                 if (CornerFromLeft is FlickableCorner)
                 {
                     ((FlickableCorner)CornerFromLeft).UpdateRelatedCornerPositions(this, movedVector);
@@ -1109,7 +1114,7 @@ namespace GamenChangerCore
 
             if (CornerFromTop != null && CornerFromTop != flickedSource)
             {
-                CornerFromTop.currentRectTransform.anchoredPosition = CornerFromTop.currentRectTransform.anchoredPosition + movedVector;
+                CornerFromTop.currentRectTransform().anchoredPosition = CornerFromTop.currentRectTransform().anchoredPosition + movedVector;
                 if (CornerFromTop is FlickableCorner)
                 {
                     ((FlickableCorner)CornerFromTop).UpdateRelatedCornerPositions(this, movedVector);
@@ -1118,7 +1123,7 @@ namespace GamenChangerCore
 
             if (CornerFromBottom != null && CornerFromBottom != flickedSource)
             {
-                CornerFromBottom.currentRectTransform.anchoredPosition = CornerFromBottom.currentRectTransform.anchoredPosition + movedVector;
+                CornerFromBottom.currentRectTransform().anchoredPosition = CornerFromBottom.currentRectTransform().anchoredPosition + movedVector;
                 if (CornerFromBottom is FlickableCorner)
                 {
                     ((FlickableCorner)CornerFromBottom).UpdateRelatedCornerPositions(this, movedVector);

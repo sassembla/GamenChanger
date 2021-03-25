@@ -1,21 +1,16 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace GamenChangerCore
 {
-    // TODO: 対象となるhandlerを見つけてinspectorに表示したい感じある。
+    // TODO: 対象となるhandlerを見つけてinspectorに表示したい感じある。押したら接続線出したいね、、
     public class OneOfNCorner : Corner
     {
-        // この時点で収集は済んでるので、さてどうしたものか。接続を作るのが難しいんだよな。まあ適当に参照で繋ぐのが自由でいいなー。
         /*
             2つルートがあって、一つはダイレクト操作ルート。要素に対してのインプットを受け取ってハンドラを着火する。
             次に、それとクロスカウンターするような指定ルート。upとdownか。ループしないように、callerがこいつだったらシャットダウンしたい。できるかなーー
-
-            あ、できるな。たぶん。callstackみたいなやつを作ればいいんだ。うーん、、、重そう、、
-            サーキットブレイカーを仕込むのがよさそう。
 
             OneOfNCorner.UpdateTargetSet(targetSet)
 
@@ -25,43 +20,66 @@ namespace GamenChangerCore
             }
 
             GameObject One// 現在選ばれている要素、親Cornerか、targetSet内の何かを押したらセットされる。
-
-            // このCornerを保持するCornerがDraggableCornerで、このCornerで保持されてる要素の上でdragイベントが発生した時、次の関数が呼ばれる
-            OnHoverDown(target, others)
-
-            // このCornerを保持するCornerがDraggableCornerで、このCornerで保持されてる要素の上でdragイベントが終了した時、次の関数が呼ばれる
-            OnHoverUp(target, others)
-
-
-            oneはとりあえずセットさせた方が良さそう。選定は厳しい。
          */
 
         public GameObject One;
 
+        private IOneOfNCornerHandler listener;
+
         public new void Awake()
         {
-            base.Awake();
-
+            // TODO: このへんをScene上とかでチェックできるといいね。
             if (One == null)
             {
-                Debug.LogError("this:" + gameObject.name + " 's OneOfN/One is null. please set.");
+                Debug.LogError("this:" + gameObject.name + " 's OneOfN/One is null. please set before addComponent or instantiate.");
                 return;
             }
 
-            // containedUIComponentsへと自動的にagentを生やす
-            // TODO: もっといい方法があると思うが、、まあはい。
-            foreach (var content in containedUIComponents)
+            if (One.transform.parent != this.transform)
             {
-                var agent = content.gameObject.AddComponent<OneOfNAgent>();
-                agent.parent = this;
+                Debug.LogError("should choose one from this:" + this.gameObject + "'s child/children.");
+                return;
             }
 
-            // 親からIOneOfNCornerHandlerを探して着火する
-            var listener = transform.parent.GetComponent<IOneOfNCornerHandler>();
-            if (listener != null)
+            var listenerCandidate = transform.parent.GetComponent<IOneOfNCornerHandler>();
+            if (listenerCandidate != null)
             {
-                listener.OnInitialized(One);
+                // pass.
             }
+            else
+            {
+                Debug.LogError("this:" + gameObject + " 's OneOfN handler is not found in parent:" + transform.parent.gameObject + ". please set IOneOfNCornerHandler to parent GameObject before addComponent or instantiate.");
+                return;
+            }
+
+            listener = listenerCandidate;
+
+            // baseの初期化時に実行する関数としてこのクラスの初期化処理をセット
+            base.SetSubclassReloadAction(
+                () =>
+                {
+                    var whole = ExposureAllContents();
+
+                    // containedUIComponentsへと自動的にagentを生やす
+                    // TODO: agent勝手に付けるよりももっといい方法があると思うが、、まあはい。
+                    foreach (var content in whole)
+                    {
+                        // すでにセット済み
+                        if (content.gameObject.GetComponent<OneOfNAgent>() != null)
+                        {
+                            continue;
+                        }
+
+                        var agent = content.gameObject.AddComponent<OneOfNAgent>();
+                        agent.parent = this;
+                    }
+
+                    // 親のOnInitializedを着火する
+                    listener.OnInitialized(One, whole.Select(s => s.gameObject).ToArray());
+                }
+            );
+
+            base.Awake();
         }
 
         public void OnPointerUp(PointerEventData eventData)
@@ -77,68 +95,10 @@ namespace GamenChangerCore
             // Oneの更新
             One = currentReactedObject;
 
-            // 親からIOneOfNCornerHandlerを探して着火する
-            var listener = transform.parent.GetComponent<IOneOfNCornerHandler>();
-            if (listener != null)
-            {
-                listener.OnChangedToOne(One);
-            }
+            var whole = ExposureAllContents();
 
-            // 表示状態の変更を行う
-            // TODO: button, text, その他、、何を
-            // TODO: どう変えるか、というのを選ぶ。統一的な感じ。
-            foreach (var content in containedUIComponents)
-            {
-                var component = content.GetComponent<Button>();
-
-                // 対象のオブジェクトの特性を変える。チェックがついてることを全部やる。
-                if (currentReactedObject == component.gameObject)
-                {
-                    // disableにする
-                    component.interactable = false;
-                    continue;
-                }
-
-                // enableにする
-                component.interactable = true;
-            }
-
-            // containedUIComponents
-            /*
-                OnPointerUp eventData:Position: (62.0, 24.0)
-                delta: (0.0, 0.0)
-                eligibleForClick: True
-                pointerEnter: Text (UnityEngine.GameObject)
-                pointerPress: Button1 (UnityEngine.GameObject)
-                lastPointerPress: 
-                pointerDrag: 
-                Use Drag Threshold: True
-                Current Raycast:
-                Name: Text (UnityEngine.GameObject)
-                module: Name: Canvas (UnityEngine.GameObject)
-                eventCamera: 
-                sortOrderPriority: 0
-                renderOrderPriority: 0
-                distance: 0
-                index: 0
-                depth: 25
-                worldNormal: (0.0, 0.0, -1.0)
-                worldPosition: (0.0, 0.0, 0.0)
-                screenPosition: (62.0, 24.0)
-                module.sortOrderPriority: 0
-                module.renderOrderPriority: 0
-                sortingLayer: 0
-                sortingOrder: 0
-                Press Raycast:
-                Name: Text (UnityEngine.GameObject)
-                module: Name: Canvas (UnityEngine.GameObject)
-                eventCamera: 
-                sortOrderPriority: 0
-                renderOrderPriority: 0
-                distance: 0
-                index: 0
-                depth: 25
-            */
+            // 親のOnChangedを着火する
+            listener.OnChangedToOne(One, whole.Select(t => t.gameObject).ToArray());
         }
     }
 }

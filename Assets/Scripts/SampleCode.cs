@@ -8,13 +8,15 @@ public class SampleCode : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        Debug.Log("start:" + Time.frameCount);
         // 適当なUIを展開するコードを書く。
         // TODO: Editor側のmenuItemかデバッグメソッドでQRコードが生成される。
 
 
         var fromCorner = GameObject.Find("FromCorner").GetComponent<Corner>();
         var toCorner = GameObject.Find("ToCorner").GetComponent<Corner>();
-        fromCorner.BorrowContents(toCorner);
+        fromCorner.SwapContents(toCorner);
+        // fromCorner.TryBorrowContents(toCorner);
 
 
 

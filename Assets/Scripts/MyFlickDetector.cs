@@ -2,13 +2,15 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
+public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
 {
     public GameObject FlickableCornerPrefab;
+    public OneOfNCorner IndicatorCorner;
 
     /*
-        このレイヤーで知りたいのは、
-        今どのビューがfocusされてるか、他
+        flickableCornerに対して、flick操作に応じて関連するcornerの出現や消滅、progressを取得することができる。
+        また、対象方向へのflick先が存在しない場合、OnFlickRequestFromFlickableCornerが呼び出され、その中でcornerを追加したり接続を切り替えることで
+        無限にflick先を生成する、などができる。
     */
     public void WillAppear(FlickableCorner flickableCorner)
     {
@@ -17,6 +19,7 @@ public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
     public void DidAppear(FlickableCorner flickableCorner)
     {
         Debug.Log("DidAppear:" + flickableCorner);
+        // IndicatorCorner.
     }
     public void AppearCancelled(FlickableCorner flickableCorner)
     {
@@ -29,7 +32,7 @@ public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
     }
     public void AppearProgress(FlickableCorner flickableCorner, float progress)
     {
-        Debug.Log("AppearProgress:" + flickableCorner + " progress:" + progress);
+        // Debug.Log("AppearProgress:" + flickableCorner + " progress:" + progress);
     }
 
 
@@ -52,34 +55,36 @@ public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
     }
     public void DisppearProgress(FlickableCorner flickableCorner, float progress)
     {
-        Debug.Log("DisppearProgress:" + flickableCorner + " progress:" + progress);
+        // Debug.Log("DisppearProgress:" + flickableCorner + " progress:" + progress);
     }
 
 
     private int count = 0;
     // フリックの開始時にリクエストを検知し、ビューの建て増しと削除が可能になる。
-    public void OnFlickRequestFromFlickableCorner(FlickableCorner flickableCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir)
+    public void OnFlickRequestFromFlickableCorner(FlickableCorner flickingCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir)
     {
-        Debug.Log("OnFlickRequestFromFlickableCorner");
+        Debug.Log("OnFlickRequestFromFlickableCorner:" + Time.frameCount);
         // leftが空なFlickableCornerに対して右フリックをした際、左側にコンテンツを偽造する
         if (plannedFlickDir == FlickDirection.RIGHT && cornerFromLeft == null)
         {
             // cornerFromLeftに代入する
             var newCorner = Instantiate(FlickableCornerPrefab, this.transform).GetComponent<FlickableCorner>();
 
-            // 左側にくるようにセット
-            newCorner.currentRectTransform.anchoredPosition = new Vector2(flickableCorner.currentRectTransform.anchoredPosition.x - flickableCorner.currentRectTransform.sizeDelta.x, flickableCorner.currentRectTransform.anchoredPosition.y);
-
-            newCorner.CornerFromRight = flickableCorner;
+            // 作成したcornerを、現在flick操作中のcornerの左側にくるようにセット
+            newCorner.currentRectTransform().anchoredPosition = new Vector2(flickingCorner.currentRectTransform().anchoredPosition.x - flickingCorner.currentRectTransform().sizeDelta.x, flickingCorner.currentRectTransform().anchoredPosition.y);
+            newCorner.CornerFromRight = flickingCorner;
             cornerFromLeft = newCorner;
             count++;
 
             // ボタンにカウント表示をセットする
-            var button = newCorner.ExposureContents()[0].GetComponent<Button>();
-            if (button != null)
+            if (newCorner.TryExposureContents<Button>(out var buttons))
             {
-                var text = button.GetComponentInChildren<Text>();
+                var text = buttons[0].GetComponentInChildren<Text>();
                 text.text = text.text + ":" + count;
+            }
+            else
+            {
+                Debug.LogError("ボタンがない 1");
             }
             return;
         }
@@ -90,19 +95,21 @@ public class FlickDetector : MonoBehaviour, IFlickableCornerHandler
             // cornerFromRightに代入する
             var newCorner = Instantiate(FlickableCornerPrefab, this.transform).GetComponent<FlickableCorner>();
 
-            // 右側にくるようにセット
-            newCorner.currentRectTransform.anchoredPosition = new Vector2(flickableCorner.currentRectTransform.anchoredPosition.x + flickableCorner.currentRectTransform.sizeDelta.x, flickableCorner.currentRectTransform.anchoredPosition.y);
-
-            newCorner.CornerFromLeft = flickableCorner;
+            // 作成したcornerを、現在flick操作中のcornerの右側にくるようにセット
+            newCorner.currentRectTransform().anchoredPosition = new Vector2(flickingCorner.currentRectTransform().anchoredPosition.x + flickingCorner.currentRectTransform().sizeDelta.x, flickingCorner.currentRectTransform().anchoredPosition.y);
+            newCorner.CornerFromLeft = flickingCorner;
             cornerFromRight = newCorner;
             count++;
 
             // ボタンにカウント表示をセットする
-            var button = newCorner.ExposureContents()[0].GetComponent<Button>();
-            if (button != null)
+            if (newCorner.TryExposureContents<Button>(out var buttons))
             {
-                var text = button.GetComponentInChildren<Text>();
+                var text = buttons[0].GetComponentInChildren<Text>();
                 text.text = text.text + ":" + count;
+            }
+            else
+            {
+                Debug.LogError("ボタンがない 2");
             }
             return;
         }
