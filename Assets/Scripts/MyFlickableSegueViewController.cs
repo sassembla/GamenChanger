@@ -49,6 +49,7 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         var corner = flickDetector.GetComponent<Corner>();
         if (corner.TryExposureCorners<FlickableCorner>(out var flickableCorners))
         {
+            // fromの検出
             FlickableCorner fromFlickableCorner = null;
             switch (before.name)
             {
@@ -69,6 +70,7 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
                     return;
             }
 
+            // toの検出
             FlickableCorner targetFlickableCorner = null;
             switch (one.name)
             {
@@ -89,16 +91,28 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
                     return;
             }
 
-            var (isFound, animation) = FlickableCorner.TryFindingAutoFlickRoute(fromFlickableCorner, targetFlickableCorner);
+            // TODO: flickableのDiDAppear経由でこのchangeToOneに来るので、無限ループする可能性がある。これを綺麗に理解したいところだが
+
+            var (isFound, driver) = FlickableCorner.TryFindingAutoFlickRoute(fromFlickableCorner, targetFlickableCorner);
             if (isFound)
             {
+                // TODO: このへんでdriverを持っておくとおもしろそう。stopしたいので、、
+                IEnumerator driveCor()
+                {
+                    while (driver.MoveNext())
+                    {
+                        yield return null;
+                    }
+                };
+
                 // 開始する
-                StartCoroutine(animation);
+                StartCoroutine(driveCor());
             }
         }
     }
 
     // oneOfNのoneがどこかでコードから選択された際に呼ばれる
+    // TODO: これともう一個のOneOfNのメソッド、どっちかだけにした方がいい気がするなー、単純に難しい。
     public GameObject OnSelectOneOfNFromCodeWithCorner(Corner corner, GameObject[] all)
     {
         switch (corner.name)

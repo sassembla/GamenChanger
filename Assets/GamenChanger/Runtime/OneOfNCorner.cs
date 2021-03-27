@@ -105,6 +105,7 @@ namespace GamenChangerCore
         }
 
         // UIを操作した副作用をlistenerに解析させ、OneOfNに反映させる
+        // TODO: このメソッド微妙なので、インターフェースの方を叩かせるような作りにしたい。listener側に関数を実装させて、そっちを叩いたらうんぬんが一番良い。
         public void SelectOneWithCorner(Corner corner)
         {
             var whole = ExposureAllContents().Select(s => s.gameObject).ToArray();
@@ -132,30 +133,31 @@ namespace GamenChangerCore
         }
 
         // このOneOfNが含んでいるRectTransformを指定してOneを更新する。
-        public void SelectOneWithContent(RectTransform contentInOneOfN)
-        {
-            if (!ExposureAllContents().Contains(contentInOneOfN))
-            {
-                return;
-            }
+        // TODO: 使い勝手が難しいので、コードで書かせるのはインターフェースが持ってる奴だけの方が良さそう。
+        // public void SelectOneWithContent(RectTransform contentInOneOfN)
+        // {
+        //     if (!ExposureAllContents().Contains(contentInOneOfN))
+        //     {
+        //         return;
+        //     }
 
-            var newOne = contentInOneOfN.gameObject;
+        //     var newOne = contentInOneOfN.gameObject;
 
-            // すでに同じオブジェクトが押された後であれば無視する
-            if (newOne == One)
-            {
-                return;
-            }
+        //     // すでに同じオブジェクトが押された後であれば無視する
+        //     if (newOne == One)
+        //     {
+        //         return;
+        //     }
 
-            var before = One;
+        //     var before = One;
 
-            // Oneの更新
-            One = newOne;
+        //     // Oneの更新
+        //     One = newOne;
 
-            var whole = ExposureAllContents().Select(s => s.gameObject).ToArray();
+        //     var whole = ExposureAllContents().Select(s => s.gameObject).ToArray();
 
-            // 親のOnChangedを着火する
-            listener.OnChangedToOne(One, before, whole);
-        }
+        //     // 親のOnChangedを着火する
+        //     listener.OnChangedToOne(One, before, whole);
+        // }
     }
 }

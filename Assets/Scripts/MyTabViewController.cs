@@ -2,7 +2,7 @@ using GamenChangerCore;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class MyOneOfNHandler : MonoBehaviour, IOneOfNCornerHandler
+public class MyTabViewController : MonoBehaviour, IOneOfNCornerHandler
 {
     // 表示するコーナーと表示内容を保持しておくコーナーを複数持つ
     public Corner corner;
@@ -22,6 +22,27 @@ public class MyOneOfNHandler : MonoBehaviour, IOneOfNCornerHandler
                 continue;
             }
             button.interactable = true;
+        }
+
+        // oneの好きなパラメータで内容を変更する
+        // TODO: とはいえstringは最悪なので、何かしらこのへんも宣言的にしたいところ。indexとか？ oneOfNみたいな概念でラップすればつけられるな。ただ結局どう並ぶかの法則を知らないと困る。
+        switch (one.name)
+        {
+            case "Button1":
+                corner.BackContentsIfNeed();
+                corner.TryBorrowContents(corner1st);
+                break;
+            case "Button2":
+                corner.BackContentsIfNeed();
+                corner.TryBorrowContents(corner2nd);
+                break;
+            case "Button3":
+                corner.BackContentsIfNeed();
+                corner.TryBorrowContents(corner3rd);
+                break;
+            default:
+                Debug.LogError("unhandled name:" + one.gameObject.name);
+                break;
         }
     }
 

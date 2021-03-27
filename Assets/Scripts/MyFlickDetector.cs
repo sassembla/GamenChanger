@@ -6,7 +6,6 @@ using UnityEngine.UI;
 public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
 {
     public GameObject FlickableCornerPrefab;
-    public OneOfNCorner IndicatorCorner;
 
 
     /*
@@ -21,27 +20,29 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
     public void DidAppear(FlickableCorner flickableCorner)
     {
         Debug.Log("DidAppear:" + flickableCorner);
-        // IndicatorCorner.SelectOneWithCorner(flickableCorner);
 
-        var contents = IndicatorCorner.ExposureAllContents();
-        switch (flickableCorner.name)
-        {
-            case "FrickableCorner1":
-                IndicatorCorner.SelectOneWithContent(contents[0]);
-                break;
-            case "FrickableCorner2":
-                IndicatorCorner.SelectOneWithContent(contents[1]);
-                break;
-            case "FrickableCorner3":
-                IndicatorCorner.SelectOneWithContent(contents[2]);
-                break;
-            case "FrickableCorner4":
-                IndicatorCorner.SelectOneWithContent(contents[3]);
-                break;
-            default:
-                Debug.LogError("unhandled corner:" + flickableCorner.name);
-                break;
-        }
+        // TODO: どうにかしてflickを上位に伝えたいが、なんかいい手がないかな。まあここで自分でsequeの更新を呼ぶのやだよなあ。更新は自分でできればいいんだよな。押された、と別にすればいいだけっていう感じはある。
+
+        // TODO: この関数消した方が良さそう、使い勝手が難しい。
+        // var contents = IndicatorCorner.ExposureAllContents();
+        // switch (flickableCorner.name)
+        // {
+        //     case "FrickableCorner1":
+        //         IndicatorCorner.SelectOneWithContent(contents[0]);
+        //         break;
+        //     case "FrickableCorner2":
+        //         IndicatorCorner.SelectOneWithContent(contents[1]);
+        //         break;
+        //     case "FrickableCorner3":
+        //         IndicatorCorner.SelectOneWithContent(contents[2]);
+        //         break;
+        //     case "FrickableCorner4":
+        //         IndicatorCorner.SelectOneWithContent(contents[3]);
+        //         break;
+        //     default:
+        //         Debug.LogError("unhandled corner:" + flickableCorner.name);
+        //         break;
+        // }
     }
 
     public void AppearCancelled(FlickableCorner flickableCorner)

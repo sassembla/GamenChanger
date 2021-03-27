@@ -7,7 +7,7 @@ namespace GamenChangerCore
 {
     /*
         フリック可能なCorner
-        // TODO: 対象となるhandlerを見つけてinspectorに表示したい感じある。
+        // TODO: 対象となるhandlerやcornerを見つけてinspectorに表示不可だがクリックすると光るボタンとして表示したい感じある。
     */
     public class FlickableCorner : Corner, IDragHandler, IEndDragHandler, IInitializePotentialDragHandler, IBeginDragHandler, IPointerEnterHandler
     {
@@ -422,19 +422,6 @@ namespace GamenChangerCore
         private Vector2 cornerFromBottomInitialPos;
 
 
-        // フリック機能の状態
-        // TODO: インターフェース化しそう
-        // 自身が保持しているコンテンツに対する警告なので、要素がICornerを持っていたらwillDisappearとかが着火できる
-        private void WillBeginFlick()
-        {
-            // Debug.Log("フリックを開始する dir:" + dir);
-        }
-
-        private void DidEndFlicked()
-        {
-            // Debug.Log("フリックを終了する dir:" + dir);
-        }
-
         // willDisappearを自身のコンテンツに出し、willAppearを関連する方向のコンテンツに出す
         private void NotifyAppearance(Vector2 delta)
         {
@@ -837,46 +824,56 @@ namespace GamenChangerCore
                     break;
             }
 
+            // このCornerと関連Cornerの最終位置を確定させる。
+            SetFixedPositionFromInitialPos(moveByUnitSizeVec);
+        }
+
+        // 初期位置から換算した差分を与えて、このCornerと関連するCornerの位置を確定させる。
+        private void SetFixedPositionFromInitialPos(Vector2 diff)
+        {
             // 自身の位置を確定させる
-            currentRectTransform().anchoredPosition = initalPos + moveByUnitSizeVec;
+            currentRectTransform().anchoredPosition = initalPos + diff;
 
             // 関連cornerの位置を確定させる + 関連コーナーにさらに関連がある場合連動させる。
             // 自身を渡しているのは、関連する要素が保持しているfrom系のcornerがこれ自身な可能性があり、そうすると二重に移動されてしまうのを、自身と対象を比較させて不要な移動だけをキャンセルするため。
             if (CornerFromLeft != null)
             {
-                CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + moveByUnitSizeVec;
+                CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + diff;
                 if (CornerFromLeft is FlickableCorner)
                 {
-                    ((FlickableCorner)CornerFromLeft).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
+                    ((FlickableCorner)CornerFromLeft).UpdateRelatedCornerPositions(this, diff);
                 }
             }
             if (CornerFromRight != null)
             {
-                CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + moveByUnitSizeVec;
+                CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + diff;
                 if (CornerFromRight is FlickableCorner)
                 {
-                    ((FlickableCorner)CornerFromRight).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
+                    ((FlickableCorner)CornerFromRight).UpdateRelatedCornerPositions(this, diff);
                 }
             }
             if (CornerFromTop != null)
             {
-                CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + moveByUnitSizeVec;
+                CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + diff;
                 if (CornerFromTop is FlickableCorner)
                 {
-                    ((FlickableCorner)CornerFromTop).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
+                    ((FlickableCorner)CornerFromTop).UpdateRelatedCornerPositions(this, diff);
                 }
             }
             if (CornerFromBottom != null)
             {
-                CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + moveByUnitSizeVec;
+                CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + diff;
                 if (CornerFromBottom is FlickableCorner)
                 {
-                    ((FlickableCorner)CornerFromBottom).UpdateRelatedCornerPositions(this, moveByUnitSizeVec);
+                    ((FlickableCorner)CornerFromBottom).UpdateRelatedCornerPositions(this, diff);
                 }
             }
         }
 
-        // TODO: この方法だとdeltaが足し算になってしまってこれは誤差がすごそう、、うーん、、、まあ実機でやってみよう -> やってみた感じ、フリック開始からちょっとだけでもいいから加速があった方がそれぽい。さてどうやって加速を作り出せるようにするかというと、速度か。精度はイマイチなので何かしら手を加えたいところ。加速度に応じた離れと吸着をやれば良さそう。
+
+
+        // TODO: この方法だとdeltaが足し算になってしまってこれは誤差がすごそう、、うーん、、、まあ実機でやってみよう -> やってみた感じ、フリック開始からちょっとだけでもいいから加速があった方がそれぽい。さてどうやって加速を作り出せるようにするかというと、速度か。
+        // 精度はイマイチなので何かしら手を加えたいところ。加速度に応じた離れと吸着をやれば良さそう。やっぱり多重な点か。ここもアニメーション可能なように挟み込みたいところ。
         // 本当はmove towardsな感じで、タッチ位置のbefore-afterをみるのが良さそう。
         // TODO: あとそもそもタッチポイントがダイレクトに領域をその動かす対象とするのが気持ち悪いんだよな、、、中間体があったほうがいい気がする。
         private void Move(Vector2 delta)
@@ -1092,6 +1089,7 @@ namespace GamenChangerCore
             return FlickDirection.NONE;
         }
 
+        // 関連するCornerの位置を更新する
         private void UpdateRelatedCornerPositions(FlickableCorner flickedSource, Vector2 movedVector)
         {
             // 関連するCornerの要素も連鎖させて移動させる。呼び出し元のオブジェクトと同じオブジェクトはすでに移動済なので移動させない。
@@ -1132,25 +1130,65 @@ namespace GamenChangerCore
             }
         }
 
+        public RectTransform[] CollectRelatedFlickableCorners()
+        {
+            var rectTrans = new List<RectTransform>();
+            CollectRelatedRectTrans(ref rectTrans, this);
+            return rectTrans.ToArray();
+        }
+
+        private void CollectRelatedRectTrans(ref List<RectTransform> rectTrans, FlickableCorner root)
+        {
+            rectTrans.Add(this.currentRectTransform());
+
+            if (CornerFromRight != null && CornerFromRight != root)
+            {
+                rectTrans.Add(CornerFromRight.currentRectTransform());
+                if (CornerFromRight is FlickableCorner)
+                {
+                    ((FlickableCorner)CornerFromRight).CollectRelatedRectTrans(ref rectTrans, this);
+                }
+            }
+
+            if (CornerFromLeft != null && CornerFromLeft != root)
+            {
+                rectTrans.Add(CornerFromLeft.currentRectTransform());
+                if (CornerFromLeft is FlickableCorner)
+                {
+                    ((FlickableCorner)CornerFromLeft).CollectRelatedRectTrans(ref rectTrans, this);
+                }
+            }
+
+            if (CornerFromTop != null && CornerFromTop != root)
+            {
+                rectTrans.Add(CornerFromTop.currentRectTransform());
+                if (CornerFromTop is FlickableCorner)
+                {
+                    ((FlickableCorner)CornerFromTop).CollectRelatedRectTrans(ref rectTrans, this);
+                }
+            }
+
+            if (CornerFromBottom != null && CornerFromBottom != root)
+            {
+                rectTrans.Add(CornerFromBottom.currentRectTransform());
+                if (CornerFromBottom is FlickableCorner)
+                {
+                    ((FlickableCorner)CornerFromBottom).CollectRelatedRectTrans(ref rectTrans, this);
+                }
+            }
+        }
+
         // fromからtoへとつながる経路探索を行う
-        public static (bool isFound, IEnumerator animation) TryFindingAutoFlickRoute(FlickableCorner from, FlickableCorner to)
+        public static (bool isFound, GamenDriver driver) TryFindingAutoFlickRoute(FlickableCorner from, FlickableCorner to)
         {
             // 接続されていれば、経路が見つかってステップが返せるはず。
             if (IsConnected(from, to, out var direction, out var steps))
             {
                 // TODO: アニメーションの自動化、Driverを作る必要がある。まあ作るんだが。
                 // Flickableに対して、特定の方向に、特定のペースで進む機構っていうのを作る。
+                // ここで動作プラン全部作ってしまった方が他のところに漏れ出さずに済むんだけど、どうせdriverでやるんだよなあ。なのでDriver内で分岐を描いた方が良さそう。
                 var driver = new GamenDriver(steps);
-
-                IEnumerator animation()
-                {
-                    while (driver.MoveNext())
-                    {
-                        yield return null;
-                    }
-                };
-
-                return (true, animation());
+                return (true, driver);
             }
 
             return (false, null);

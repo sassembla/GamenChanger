@@ -4490,7 +4490,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   FlickableCornerPrefab: {fileID: 9155850614099393204, guid: 99c1e1797fca048fe9c3b3034cd7c191,
     type: 3}
-  IndicatorCorner: {fileID: 1411096919}
 --- !u!114 &2018572558
 MonoBehaviour:
   m_ObjectHideFlags: 0
