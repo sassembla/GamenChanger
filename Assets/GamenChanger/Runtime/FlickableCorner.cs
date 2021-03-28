@@ -25,7 +25,7 @@ namespace GamenChangerCore
         private FlickDirection flickDir;
         private Vector2 initalPos;
 
-        private IFlickableCornerHandler[] parentHandlers = new IFlickableCornerHandler[0];
+        private IFlickableCornerHandler parentHandler;
 
         public new void Awake()
         {
@@ -35,7 +35,7 @@ namespace GamenChangerCore
                     // 親を探して、IFlickableCornerFocusHandlerを持っているオブジェクトがあったら、変更があるたびに上流に通知を流す。
                     if (transform.parent != null)
                     {
-                        parentHandlers = transform.parent.GetComponents<IFlickableCornerHandler>();
+                        parentHandler = transform.parent.GetComponent<IFlickableCornerHandler>();
                     }
                 }
             );
@@ -131,7 +131,7 @@ namespace GamenChangerCore
 
             // 開始
             state = FlickState.INIT;
-            // Debug.Log("init this:" + this);
+            NotifyTouch();
         }
 
         public void OnBeginDrag(PointerEventData eventData)
@@ -146,36 +146,7 @@ namespace GamenChangerCore
             switch (state)
             {
                 case FlickState.INIT:
-                    // 用意しているflickの種類でconstraintを切り替える。
-
-                    var delta = eventData.delta;
-
-                    // フリック方向を確定させる(左右 or 上下)
-                    var availableFlickDir = GetAvailableDirection(delta);
-
-                    // 利用できる方向がない場合、無効化する。
-                    if (availableFlickDir == FlickDirection.NONE)
-                    {
-                        state = FlickState.NONE;
-                        return;
-                    }
-
-                    flickDir = availableFlickDir;
-
-                    // from系の初期位置を保持
-                    UpdateInitialPos();
-
-                    // eventDataのパラメータを上書きし、指定のオブジェクトをドラッグしている状態に拘束する
-                    ApplyConstraintToDir(flickDir, eventData);
-
-                    // 動かす
-                    Move(eventData.delta);
-
-                    // 保持しているcornerと関連するcornerに対して、willDisappearとwillAppearを通知する。
-                    NotifyAppearance(eventData.delta);
-                    // TODO: この時に向かった方向とは逆の方向にdragし、なおかつ初期値を超えたタイミングで、キャンセルを流してなおかつ反対側にあるコンテンツがあればwillAppearを呼び出したい。
-
-                    state = FlickState.BEGIN;
+                    // pass.
                     break;
                 case FlickState.PROCESSING:
                 case FlickState.CANCELLING:
@@ -184,8 +155,39 @@ namespace GamenChangerCore
                 default:
                     // イレギュラーなので解除
                     state = FlickState.NONE;
-                    break;
+                    return;
             }
+
+            // 最初のframeのflick操作を行う
+
+            var delta = eventData.delta;
+
+            // フリック方向を確定させる(左右 or 上下)
+            var availableFlickDir = GetAvailableDirection(delta);
+
+            // 利用できる方向がない場合、無効化する。
+            if (availableFlickDir == FlickDirection.NONE)
+            {
+                state = FlickState.NONE;
+                return;
+            }
+
+            flickDir = availableFlickDir;
+
+            // from系の初期位置を保持
+            UpdateInitialPos();
+
+            // eventDataのパラメータを上書きし、指定のオブジェクトをドラッグしている状態に拘束する
+            ApplyConstraintToDir(flickDir, eventData);
+
+            // 動かす
+            Move(eventData.delta);
+
+            // 保持しているcornerと関連するcornerに対して、willDisappearとwillAppearを通知する。
+            NotifyAppearance(eventData.delta);
+            // TODO: この時に向かった方向とは逆の方向にdragし、なおかつ初期値を超えたタイミングで、キャンセルを流してなおかつ反対側にあるコンテンツがあればwillAppearを呼び出したい。
+
+            state = FlickState.BEGIN;
         }
 
         // 継続条件チェックを行うイベント
@@ -271,37 +273,6 @@ namespace GamenChangerCore
                     return;
             }
 
-            // // TODO: こいつらがキャンセルなのかなんなのかを見極める必要がある。と思ったけど付加情報ぽいな、、
-            // {
-            //     if (eventData.hovered.Count == 0)
-            //     {
-            //         // Debug.Log("end時にキャンバス外");
-            //         // state = FlickState.ENDING;
-            //         // DoneFlicked();
-            //         // return;
-            //     }
-            //     else
-            //     {
-            //         // TODO: この辺のどこかを無視しないと、キャンバス内かつパーツ外が発生してやりにくい、、ポイント位置と実位置の距離でみるのが良さそう。
-            //         if (eventData.hovered[0] != this.gameObject)
-            //         {
-            //             // Debug.Log("end時にhover下が別のもの:" + eventData.hovered[0]);
-            //             // このオブジェクトより優先度が高いものの上に到達した
-            //             // state = FlickState.ENDING;
-            //             // DoneFlicked();
-            //             // return;
-            //         }
-            //     }
-
-            //     if (eventData.pointerDrag != this.gameObject)
-            //     {
-            //         // Debug.Log("end時に違うものをドラッグした状態で到達");
-            //         // state = FlickState.ENDING;
-            //         // DoneFlicked();
-            //         // return;
-            //     }
-            // }
-
             // 正常にflickの終了に到達したので、flick発生かどうかを判定する。
 
             // flickが発生したかどうかチェックし、発生していれば移動を完了させる処理モードに入る。
@@ -364,7 +335,7 @@ namespace GamenChangerCore
             this.animationCor = animationCor();
         }
 
-        IEnumerator animationCor;
+        private IEnumerator animationCor;
 
         private bool touchInScreen = false;
         private void Update()
@@ -422,11 +393,27 @@ namespace GamenChangerCore
         private Vector2 cornerFromBottomInitialPos;
 
 
+        private void NotifyTouch()
+        {
+            // 上位のハンドラがあればそれに対してタッチ反応があったことを通知する
+            if (parentHandler != null)
+            {
+                parentHandler.Touch(this);
+            }
+
+            // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
+            // TODO: GetComponentsInChildren系を消したいところ。
+            foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
+            {
+                containedUIComponent.Touch();
+            }
+        }
+
         // willDisappearを自身のコンテンツに出し、willAppearを関連する方向のコンテンツに出す
         private void NotifyAppearance(Vector2 delta)
         {
             // 上位のハンドラがあればそれに対して消える予定を通知する
-            foreach (var parentHandler in parentHandlers)
+            if (parentHandler != null)
             {
                 parentHandler.WillDisappear(this);
             }
@@ -475,7 +462,7 @@ namespace GamenChangerCore
         // 上流へとWillAppearを送り出す
         private void SendWillAppear()
         {
-            foreach (var parentHandler in parentHandlers)
+            if (parentHandler != null)
             {
                 parentHandler.WillAppear(this);
             }
@@ -485,7 +472,7 @@ namespace GamenChangerCore
         private void NotifyCancelled()
         {
             // 上位のハンドラがあればそれに対して消える予定のキャンセルを通知する
-            foreach (var parentHandler in parentHandlers)
+            if (parentHandler != null)
             {
                 parentHandler.DisppearCancelled(this);
             }
@@ -525,7 +512,7 @@ namespace GamenChangerCore
         // 上流へと出現キャンセルを送り出す
         private void SendAppearCancelled()
         {
-            foreach (var parentHandler in parentHandlers)
+            if (parentHandler != null)
             {
                 parentHandler.AppearCancelled(this);
             }
@@ -535,7 +522,7 @@ namespace GamenChangerCore
         private void NotifyProcessed(FlickDirection resultDir)
         {
             // 上位のハンドラがあればそれに対して消えたことを通知する
-            foreach (var parentHandler in parentHandlers)
+            if (parentHandler != null)
             {
                 parentHandler.DidDisappear(this);
             }
@@ -584,7 +571,7 @@ namespace GamenChangerCore
         // 上流へと出現完了を送り出す
         private void SendDidAppear()
         {
-            foreach (var parentHandler in parentHandlers)
+            if (parentHandler != null)
             {
                 parentHandler.DidAppear(this);
             }
@@ -618,7 +605,7 @@ namespace GamenChangerCore
             var estimatedFlickDir = EstimateFlickDir(deltaMove);
 
             // 上位のハンドラがあれば追加する方向のリクエストを行う
-            foreach (var parentHandler in parentHandlers)
+            if (parentHandler != null)
             {
                 parentHandler.OnFlickRequestFromFlickableCorner(this, ref CornerFromLeft, ref CornerFromRight, ref CornerFromTop, ref CornerFromBottom, estimatedFlickDir);
             }
@@ -978,7 +965,7 @@ namespace GamenChangerCore
                 var disappearProgress = Mathf.Max(0f, 1.0f - progress);
 
                 // 上流があればdisappear度合いを伝える
-                foreach (var parentHandler in parentHandlers)
+                if (parentHandler != null)
                 {
                     parentHandler.DisppearProgress(this, disappearProgress);
                 }
@@ -1010,7 +997,7 @@ namespace GamenChangerCore
                 var disappearProgress = Mathf.Max(0f, 1.0f - progress);
 
                 // 上流があればdisappear度合いを伝える
-                foreach (var parentHandler in parentHandlers)
+                if (parentHandler != null)
                 {
                     parentHandler.DisppearProgress(this, disappearProgress);
                 }
@@ -1054,7 +1041,7 @@ namespace GamenChangerCore
         // 出現度合いを上流に通知する
         private void SendAppearProgress(float progress)
         {
-            foreach (var parentHandler in parentHandlers)
+            if (parentHandler != null)
             {
                 parentHandler.AppearProgress(this, progress);
             }
@@ -1181,12 +1168,18 @@ namespace GamenChangerCore
         // fromからtoへとつながる経路探索を行う
         public static (bool isFound, GamenDriver driver) TryFindingAutoFlickRoute(FlickableCorner from, FlickableCorner to)
         {
+            if (from == null)
+            {
+                return (false, null);
+            }
+            if (to == null)
+            {
+                return (false, null);
+            }
+
             // 接続されていれば、経路が見つかってステップが返せるはず。
             if (IsConnected(from, to, out var direction, out var steps))
             {
-                // TODO: アニメーションの自動化、Driverを作る必要がある。まあ作るんだが。
-                // Flickableに対して、特定の方向に、特定のペースで進む機構っていうのを作る。
-                // ここで動作プラン全部作ってしまった方が他のところに漏れ出さずに済むんだけど、どうせdriverでやるんだよなあ。なのでDriver内で分岐を描いた方が良さそう。
                 var driver = new GamenDriver(steps);
                 return (true, driver);
             }

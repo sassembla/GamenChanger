@@ -5,14 +5,21 @@ using UnityEngine.UI;
 
 public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
 {
-    public GameObject FlickableCornerPrefab;
+    public Action<int> selectIndicator;
 
+    public GameObject FlickableCornerPrefab;
 
     /*
         flickableCornerに対して、flick操作に応じて関連するcornerの出現や消滅、progressを取得することができる。
         また、対象方向へのflick先が存在しない場合、OnFlickRequestFromFlickableCornerが呼び出され、その中でcornerを追加したり接続を切り替えることで
         無限にflick先を生成する、などができる。
     */
+    public void Touch(FlickableCorner flickableCorner)
+    {
+        Debug.Log("Touch:" + flickableCorner);
+        // TODO: この辺をどうにかして上位に伝えると、driveのキャンセルができるようになる。
+    }
+
     public void WillAppear(FlickableCorner flickableCorner)
     {
         Debug.Log("WillAppear:" + flickableCorner);
@@ -21,33 +28,29 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
     {
         Debug.Log("DidAppear:" + flickableCorner);
 
-        // TODO: どうにかしてflickを上位に伝えたいが、なんかいい手がないかな。まあここで自分でsequeの更新を呼ぶのやだよなあ。更新は自分でできればいいんだよな。押された、と別にすればいいだけっていう感じはある。
-
-        // TODO: この関数消した方が良さそう、使い勝手が難しい。
-        // var contents = IndicatorCorner.ExposureAllContents();
-        // switch (flickableCorner.name)
-        // {
-        //     case "FrickableCorner1":
-        //         IndicatorCorner.SelectOneWithContent(contents[0]);
-        //         break;
-        //     case "FrickableCorner2":
-        //         IndicatorCorner.SelectOneWithContent(contents[1]);
-        //         break;
-        //     case "FrickableCorner3":
-        //         IndicatorCorner.SelectOneWithContent(contents[2]);
-        //         break;
-        //     case "FrickableCorner4":
-        //         IndicatorCorner.SelectOneWithContent(contents[3]);
-        //         break;
-        //     default:
-        //         Debug.LogError("unhandled corner:" + flickableCorner.name);
-        //         break;
-        // }
+        switch (flickableCorner.name)
+        {
+            case "FrickableCorner1":
+                selectIndicator(0);
+                break;
+            case "FrickableCorner2":
+                selectIndicator(1);
+                break;
+            case "FrickableCorner3":
+                selectIndicator(2);
+                break;
+            case "FrickableCorner4":
+                selectIndicator(3);
+                break;
+            default:
+                Debug.Log("unhandled corner:" + flickableCorner.name);
+                break;
+        }
     }
 
     public void AppearCancelled(FlickableCorner flickableCorner)
     {
-        Debug.Log("AppearCancelled:" + flickableCorner);
+        // Debug.Log("AppearCancelled:" + flickableCorner);
         if (flickableCorner.gameObject.name.Contains("FrickableCornerPrefab"))
         {
             // prefabから作ったやつだったら消す
@@ -62,11 +65,11 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
 
     public void WillDisappear(FlickableCorner flickableCorner)
     {
-        Debug.Log("WillDisappear:" + flickableCorner);
+        // Debug.Log("WillDisappear:" + flickableCorner);
     }
     public void DidDisappear(FlickableCorner flickableCorner)
     {
-        Debug.Log("DidDisappear:" + flickableCorner);
+        // Debug.Log("DidDisappear:" + flickableCorner);
         if (flickableCorner.gameObject.name.Contains("FrickableCornerPrefab"))
         {
             // prefabから作ったやつだったら消す
@@ -75,7 +78,7 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
     }
     public void DisppearCancelled(FlickableCorner flickableCorner)
     {
-        Debug.Log("DisppearCancelled:" + flickableCorner);
+        // Debug.Log("DisppearCancelled:" + flickableCorner);
     }
     public void DisppearProgress(FlickableCorner flickableCorner, float progress)
     {

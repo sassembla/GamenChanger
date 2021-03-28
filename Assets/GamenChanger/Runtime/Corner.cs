@@ -11,7 +11,8 @@ namespace GamenChangerCore
         コーナーの内容を挿げ替える -> できた
         フリック可能にしてみる -> できた
         OneOfNを作ってみる -> できた
-        TODO: prefabを使ったcorner生成のフローなどをつくってみる
+        prefabを使ったcorner生成のフローなどをつくってみる -> できた
+        TODO: sequeがあるFlickableViewを作ってみる
     */
     public class Corner : MonoBehaviour
     {

@@ -2,14 +2,16 @@
 using GamenChangerCore;
 using UnityEngine.UI;
 using System.Collections;
-using System.Linq;
+using System;
 
 public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandler
 {
     public MyFlickDetector flickDetector;
 
-    public void OnInitialized(GameObject one, GameObject[] all)
+    public void OnInitialized(GameObject one, GameObject[] all, Action<GameObject> setToOneOfNAct)
     {
+        // sequeが初期化された
+
         // UIの調整
         foreach (var a in all)
         {
@@ -25,10 +27,15 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
             // 選択されていないのでinteractableをtrueにする。
             button.interactable = true;
         }
+
+        // フリックの結果をOneOfNの選択に紐づける
+        flickDetector.selectIndicator = index => setToOneOfNAct(all[index]);
     }
 
-    public void OnChangedToOne(GameObject one, GameObject before, GameObject[] all)
+    public void OnChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all)
     {
+        // sequeのどれか一つがUI操作によって更新された
+
         // UIの調整
         foreach (var a in all)
         {
@@ -91,8 +98,7 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
                     return;
             }
 
-            // TODO: flickableのDiDAppear経由でこのchangeToOneに来るので、無限ループする可能性がある。これを綺麗に理解したいところだが
-
+            // sequeが操作されたので、flickableCornerの中でフォーカスしてあるものを変更する。
             var (isFound, driver) = FlickableCorner.TryFindingAutoFlickRoute(fromFlickableCorner, targetFlickableCorner);
             if (isFound)
             {
@@ -111,26 +117,25 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         }
     }
 
-    // oneOfNのoneがどこかでコードから選択された際に呼ばれる
-    // TODO: これともう一個のOneOfNのメソッド、どっちかだけにした方がいい気がするなー、単純に難しい。
-    public GameObject OnSelectOneOfNFromCodeWithCorner(Corner corner, GameObject[] all)
+    public void OnChangedToOneByHandler(GameObject one, GameObject before, GameObject[] all)
     {
-        switch (corner.name)
-        {
-            case "FrickableCorner1":
-                return all[0];
-            case "FrickableCorner2":
-                return all[1];
-            case "FrickableCorner3":
-                return all[2];
-            case "FrickableCorner4":
-                return all[3];
-            default:
-                Debug.LogError("unhandled corner:" + corner.name);
-                break;
-        }
+        // sequeのどれか一つがhandlerによって更新された
 
-        return null;
+        // UIの調整
+        foreach (var a in all)
+        {
+            var button = a.GetComponent<Button>();
+
+            // aがoneと一緒だった場合、選択されているのでinteractableをfalseにする。
+            if (a == one)
+            {
+                button.interactable = false;
+                continue;
+            }
+
+            // 選択されていないのでinteractableをtrueにする。
+            button.interactable = true;
+        }
     }
 
 

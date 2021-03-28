@@ -2,6 +2,8 @@ namespace GamenChangerCore
 {
     public interface ICornerContent
     {
+        void Touch();
+
         void WillAppear();
         void AppearProgress(float progress);
         void AppearCancelled();

@@ -1,3 +1,4 @@
+using System;
 using GamenChangerCore;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,8 +10,47 @@ public class MyTabViewController : MonoBehaviour, IOneOfNCornerHandler
     public Corner corner1st;
     public Corner corner2nd;
     public Corner corner3rd;
+    public Action<GameObject> setToOneOfNAct;
 
-    public void OnInitialized(GameObject one, GameObject[] all)
+    public void OnInitialized(GameObject one, GameObject[] all, Action<GameObject> setToOneOfNAct)
+    {
+        // UIの調整
+        foreach (var a in all)
+        {
+            var button = a.GetComponent<Button>();
+            if (a == one)
+            {
+                button.interactable = false;
+                continue;
+            }
+            button.interactable = true;
+        }
+
+        // oneの好きなパラメータで内容を変更する
+        // TODO: とはいえstringは最悪なので、何かしらこのへんも宣言的にしたいところ。indexとか？ oneOfNみたいな概念でラップすればつけられるな。ただ結局どう並ぶかの法則を知らないと困る。
+        switch (one.name)
+        {
+            case "Button1":
+                corner.BackContentsIfNeed();
+                corner.TryBorrowContents(corner1st);
+                break;
+            case "Button2":
+                corner.BackContentsIfNeed();
+                corner.TryBorrowContents(corner2nd);
+                break;
+            case "Button3":
+                corner.BackContentsIfNeed();
+                corner.TryBorrowContents(corner3rd);
+                break;
+            default:
+                Debug.LogError("unhandled name:" + one.gameObject.name);
+                break;
+        }
+
+        this.setToOneOfNAct = setToOneOfNAct;
+    }
+
+    public void OnChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all)
     {
         // UIの調整
         foreach (var a in all)
@@ -46,7 +86,7 @@ public class MyTabViewController : MonoBehaviour, IOneOfNCornerHandler
         }
     }
 
-    public void OnChangedToOne(GameObject one, GameObject before, GameObject[] all)
+    public void OnChangedToOneByHandler(GameObject one, GameObject before, GameObject[] all)
     {
         // UIの調整
         foreach (var a in all)
@@ -59,31 +99,5 @@ public class MyTabViewController : MonoBehaviour, IOneOfNCornerHandler
             }
             button.interactable = true;
         }
-
-        // oneの好きなパラメータで内容を変更する
-        // TODO: とはいえstringは最悪なので、何かしらこのへんも宣言的にしたいところ。indexとか？ oneOfNみたいな概念でラップすればつけられるな。ただ結局どう並ぶかの法則を知らないと困る。
-        switch (one.name)
-        {
-            case "Button1":
-                corner.BackContentsIfNeed();
-                corner.TryBorrowContents(corner1st);
-                break;
-            case "Button2":
-                corner.BackContentsIfNeed();
-                corner.TryBorrowContents(corner2nd);
-                break;
-            case "Button3":
-                corner.BackContentsIfNeed();
-                corner.TryBorrowContents(corner3rd);
-                break;
-            default:
-                Debug.LogError("unhandled name:" + one.gameObject.name);
-                break;
-        }
-    }
-
-    public GameObject OnSelectOneOfNFromCodeWithCorner(Corner choosedCorner, GameObject[] all)
-    {
-        return null;
     }
 }

@@ -76,7 +76,28 @@ namespace GamenChangerCore
                     }
 
                     // 親のOnInitializedを着火する
-                    listener.OnInitialized(One, whole.Select(s => s.gameObject).ToArray());
+                    listener.OnInitialized(
+                        One,
+                        whole.Select(s => s.gameObject).ToArray(),
+                        newOne =>
+                        {
+                            // すでに同じオブジェクトが押された後であれば無視する
+                            if (newOne == One)
+                            {
+                                return;
+                            }
+
+                            var before = One;
+
+                            // Oneの更新
+                            One = newOne;
+
+                            var wholeContents = ExposureAllContents();
+
+                            // 親のOnChangedByListenerを着火する
+                            listener.OnChangedToOneByHandler(One, before, wholeContents.Select(t => t.gameObject).ToArray());
+                        }
+                    );
                 }
             );
 
@@ -101,63 +122,7 @@ namespace GamenChangerCore
             var whole = ExposureAllContents();
 
             // 親のOnChangedを着火する
-            listener.OnChangedToOne(One, before, whole.Select(t => t.gameObject).ToArray());
+            listener.OnChangedToOneByPlayer(One, before, whole.Select(t => t.gameObject).ToArray());
         }
-
-        // UIを操作した副作用をlistenerに解析させ、OneOfNに反映させる
-        // TODO: このメソッド微妙なので、インターフェースの方を叩かせるような作りにしたい。listener側に関数を実装させて、そっちを叩いたらうんぬんが一番良い。
-        public void SelectOneWithCorner(Corner corner)
-        {
-            var whole = ExposureAllContents().Select(s => s.gameObject).ToArray();
-            var newOne = listener.OnSelectOneOfNFromCodeWithCorner(corner, whole);
-
-            // nullが帰ってきたら無視する。
-            if (newOne == null)
-            {
-                return;
-            }
-
-            // すでに同じオブジェクトが押された後であれば無視する
-            if (newOne == One)
-            {
-                return;
-            }
-
-            var before = One;
-
-            // Oneの更新
-            One = newOne;
-
-            // 親のOnChangedを着火する
-            listener.OnChangedToOne(One, before, whole);
-        }
-
-        // このOneOfNが含んでいるRectTransformを指定してOneを更新する。
-        // TODO: 使い勝手が難しいので、コードで書かせるのはインターフェースが持ってる奴だけの方が良さそう。
-        // public void SelectOneWithContent(RectTransform contentInOneOfN)
-        // {
-        //     if (!ExposureAllContents().Contains(contentInOneOfN))
-        //     {
-        //         return;
-        //     }
-
-        //     var newOne = contentInOneOfN.gameObject;
-
-        //     // すでに同じオブジェクトが押された後であれば無視する
-        //     if (newOne == One)
-        //     {
-        //         return;
-        //     }
-
-        //     var before = One;
-
-        //     // Oneの更新
-        //     One = newOne;
-
-        //     var whole = ExposureAllContents().Select(s => s.gameObject).ToArray();
-
-        //     // 親のOnChangedを着火する
-        //     listener.OnChangedToOne(One, before, whole);
-        // }
     }
 }

@@ -1,8 +1,12 @@
 using GamenChangerCore;
 using UnityEngine;
 
-public class CornerContents : MonoBehaviour, ICornerContent
+public class MyCornerContents : MonoBehaviour, ICornerContent
 {
+    public void Touch()
+    {
+        // Debug.Log("Touch" + "\tparent:" + transform.parent.gameObject);
+    }
 
     public void WillAppear()
     {
