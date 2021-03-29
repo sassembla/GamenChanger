@@ -86,13 +86,17 @@ namespace GamenChangerCore
             base.Awake();
         }
 
-        private struct DeltaLimit
+        private class DragObject
         {
             public readonly float TopSize;
             public readonly float RightSize;
             public readonly float BottomSize;
             public readonly float LeftSize;
-            public DeltaLimit(RectTransform parent, RectTransform content)
+
+            public readonly RectTransform contentRectTrans;
+            public readonly Vector2 initialAnchoredPosition;
+
+            public DragObject(RectTransform parent, RectTransform contentRectTrans, PointerEventData eventData)
             {
                 /*
                     uGUI conrer内でのcontentの位置を知る必要がある。
@@ -102,25 +106,65 @@ namespace GamenChangerCore
                 
                     これがコンテンツの中心x,yになるので、ここからそれぞれコンテンツのwidth、heightをpivotの偏りだけ移動させた値が必要になる。
                 */
-                var contentCenterX = parent.sizeDelta.x * content.anchorMin.x;
-                var contentCenterY = parent.sizeDelta.y * content.anchorMin.y;
 
-                var contentLeftTopX = contentCenterX - content.pivot.x * content.sizeDelta.x;
-                var contentLeftTopY = contentCenterY - content.pivot.y * content.sizeDelta.y;
+                var contentLeftTop = GetLeftTopPosInParent(parent, contentRectTrans);
 
                 // 移動可能なサイズを収集する。
-                this.TopSize = Mathf.Max(0, contentLeftTopY);
-                this.RightSize = Mathf.Max(0, parent.sizeDelta.x - (contentLeftTopX + content.sizeDelta.x));
-                this.BottomSize = Mathf.Max(0, parent.sizeDelta.y - (contentLeftTopY + content.sizeDelta.y));
-                this.LeftSize = Mathf.Max(0, contentLeftTopX);
+                this.TopSize = Mathf.Max(0, contentLeftTop.y);
+                this.RightSize = Mathf.Max(0, parent.sizeDelta.x - (contentLeftTop.x + contentRectTrans.sizeDelta.x));
+                this.BottomSize = Mathf.Max(0, parent.sizeDelta.y - (contentLeftTop.y + contentRectTrans.sizeDelta.y));
+                this.LeftSize = Mathf.Max(0, contentLeftTop.x);
+
+                this.contentRectTrans = contentRectTrans;
+                this.initialAnchoredPosition = contentRectTrans.anchoredPosition;
+
+                // // アンカーに基づいて、どこをタッチしたかを上書きする。たぶんなんとかなると思ってるが、、これもズレとして保持した方がいいのかもしれない。
+                // // うーん結局ハイコストだなー、深度に応じて重くなっちゃう。いやだ、、もっと簡単にできるはず、、positionがUI上の位置に変換できるはず。
+                // var currentRectLeftTopAbsPos = Vector2.zero;
+                // GetAbsPosOnCanvas(contentRectTrans.GetComponentInParent<Canvas>(), contentRectTrans.transform, ref currentRectLeftTopAbsPos);
             }
+
+            // parentに対してcontentの左上の点がどの位置にあるかをVector2として返す。
+            private Vector2 GetLeftTopPosInParent(RectTransform parent, RectTransform contentRectTrans)
+            {
+                var contentCenterX = parent.sizeDelta.x * contentRectTrans.anchorMin.x;
+                var contentCenterY = parent.sizeDelta.y * contentRectTrans.anchorMin.y;
+
+                var contentCenterLeftTopX = contentCenterX - contentRectTrans.pivot.x * contentRectTrans.sizeDelta.x;
+                var contentCenterLeftTopY = contentCenterY - contentRectTrans.pivot.y * contentRectTrans.sizeDelta.y;
+
+                var contentLeftTopX = contentCenterLeftTopX + contentRectTrans.anchoredPosition.x;
+                var contentLeftTopY = contentCenterLeftTopY - contentRectTrans.anchoredPosition.y;
+
+                return new Vector2(contentLeftTopX, contentLeftTopY);
+            }
+
+            // 自分がセットされているcanvasに対して左上アンカー位置を取得、、とやろうとしていたが、よく考えたら必要なかったので消した。
+            // private void GetAbsPosOnCanvas(Canvas canvas, Transform current, ref Vector2 distanceFromWorld)
+            // {
+            //     if (current.parent != null)
+            //     {
+            //         var posInParent = GetLeftTopPosInParent(current.parent.GetComponent<RectTransform>(), current.GetComponent<RectTransform>());
+
+            //         distanceFromWorld += posInParent;
+            //         if (current.parent.gameObject == canvas.gameObject)
+            //         {
+            //             var canvasRectTrans = canvas.GetComponent<RectTransform>();
+
+            //             // キャンバスに辿り着いたのでここで計算をしてしまう、leftTopを取るためcanvasサイズのheightから-する。
+            //             distanceFromWorld = new Vector2(distanceFromWorld.x, canvasRectTrans.sizeDelta.y - distanceFromWorld.y);
+            //             return;
+            //         }
+
+            //         GetAbsPosOnCanvas(canvas, current.parent, ref distanceFromWorld);
+            //     }
+            // }
         }
 
-        private DeltaLimit deltaLimit;
+        private DragObject dragObject;
 
         public void OnInitializePotentialDrag(DraggableAgent agent, PointerEventData eventData)
         {
-            Debug.Log("OnInitializePotentialDrag, eventData:" + eventData);
             if (currentAgent == null)
             {
                 // pass.
@@ -156,7 +200,6 @@ namespace GamenChangerCore
 
         public void OnBeginDrag(DraggableAgent agent, PointerEventData eventData)
         {
-            Debug.Log("OnBeginDrag");
             if (currentAgent == null)
             {
                 SetToNone();
@@ -188,33 +231,16 @@ namespace GamenChangerCore
 
             // 対象物のサイズとこのオブジェクトのサイズに合わせて移動可能な範囲を出し、deltaを制限する。
             var currentDraggableRect = agent.GetComponent<RectTransform>();
-            deltaLimit = new DeltaLimit(currentRectTransform(), currentDraggableRect);
+            dragObject = new DragObject(currentRectTransform(), currentDraggableRect, eventData);
 
-            var delta = eventData.delta;
-            LimitDeltaValie(eventData, deltaLimit);
-            Debug.Log("eventData.delta:" + eventData.delta);
+            // TODO: 必要があればconstraintを足そう。
+            LimitDragValue(eventData, dragObject);
 
-            // // 利用できる方向がない場合、無効化する。
-            // if (availableFlickDir == FlickDirection.NONE)
-            // {
-            //     state = FlickState.NONE;
-            //     return;
-            // }
-
-            // flickDir = availableFlickDir;
-
-            // // from系の初期位置を保持
-            // UpdateInitialPos();
-
-            // // eventDataのパラメータを上書きし、指定のオブジェクトをドラッグしている状態に拘束する
-            // ApplyConstraintToDir(flickDir, eventData);
-
-            // // 動かす
-            // Move(eventData.delta);
+            // 動かす
+            Move(dragObject, eventData.position);
 
             // // 保持しているcornerと関連するcornerに対して、willDisappearとwillAppearを通知する。
             // NotifyAppearance(eventData.delta);
-            // // TODO: この時に向かった方向とは逆の方向にdragし、なおかつ初期値を超えたタイミングで、キャンセルを流してなおかつ反対側にあるコンテンツがあればwillAppearを呼び出したい。
 
             state = DragState.BEGIN;
         }
@@ -257,39 +283,13 @@ namespace GamenChangerCore
                     return;
             }
 
-            // drag処理を行う
+            // dragの方向制約処理を行う
+            var actualMove = LimitDragValue(eventData, dragObject);
 
-            // TODO: なんかする
-            // // drag対象がついて行ってない状態なので、終了させるという条件が必要になる。
-            // // 画面外にdragしたら終了
-            // if (0 < eventData.position.x && eventData.position.x < Screen.width && 0 < eventData.position.y && eventData.position.y < Screen.height)
-            // {
-            //     // pass.
-            // }
-            // else
-            // {
-            //     // 画面外にタッチが飛び出したので、drag終了する。
-            //     OnEndDrag(eventData);
-            //     return;
-            // }
+            // 動かす
+            Move(dragObject, actualMove);
 
-            // // このオブジェクトではないものの上に到達したので、ドラッグの解除を行う
-            // if (eventData.pointerDrag != this.gameObject)
-            // {
-            //     // TODO: これって発生するのかな、、
-            //     Debug.Log("drag ハズレ3");
-            // }
-
-            // // eventDataのパラメータを上書きし、指定のオブジェクトをドラッグしている状態に拘束する
-            // ApplyConstraintToDir(flickDir, eventData);
-
-            // // ドラッグ継続
-            // Move(eventData.delta);
-
-            // // 始めたflickが許可していない逆方向に突き抜けそう、みたいなのを抑制する
-            // ApplyPositionLimitByDirection();
-
-            // var actualMoveDir = DetectFlickingDirection(eventData.delta);
+            // TODO: なんらか「こうなったらこうする」を仕込むとしたら、IDraggableCornerHandlerなんだろうな。
 
             // //progressの更新を行う
             // UpdateProgress(actualMoveDir);
@@ -330,7 +330,9 @@ namespace GamenChangerCore
             }
 
             // 正常にdragの終了に到達した
-            // TODO: なんかする
+
+
+
 
             // // flickが発生したかどうかチェックし、発生していれば移動を完了させる処理モードに入る。
             // // そうでなければ下の位置に戻すキャンセルモードに入る。
@@ -353,8 +355,9 @@ namespace GamenChangerCore
                         case DragState.RELEASING:
                             // TODO: 達成するところのアニメーションはなんか自由に頑張ってくれってやりたいんだよな、どうするかな。
 
-                            // SetToTargetPosition(flickedDir);
+                            SetToTargetPosition(dragObject);
 
+                            // TODO: 通知出す
                             // NotifyProcessed(flickedDir);
 
                             SetToNone();
@@ -379,6 +382,7 @@ namespace GamenChangerCore
         private void SetToNone()
         {
             state = DragState.NONE;
+            dragObject = null;
             currentAgent = null;
         }
 
@@ -395,30 +399,52 @@ namespace GamenChangerCore
             }
         }
 
-        private void LimitDeltaValie(PointerEventData eventData, DeltaLimit deltaLimit)
+        // 移動させる
+        private void Move(DragObject dragObject, Vector2 diff)
+        {
+            dragObject.contentRectTrans.anchoredPosition = dragObject.initialAnchoredPosition + diff;
+        }
+
+        // 位置を元に戻す
+        private void SetToTargetPosition(DragObject dragObject)
+        {
+            dragObject.contentRectTrans.anchoredPosition = dragObject.initialAnchoredPosition;
+        }
+
+
+        // 移動幅の累積を制御する
+        private Vector2 LimitDragValue(PointerEventData eventData, DragObject dragObj)
         {
             var x = 0f;
             var y = 0f;
 
-            if (eventData.delta.x < 0)
+            var basePos = eventData.pressPosition;// 押したworld位置
+            var currentPos = eventData.position;// 現在のタッチのworld位置
+
+            // 差分
+            var baseDiff = currentPos - basePos;
+
+            if (baseDiff.x < 0)
             {
-                x = -Mathf.Min(Mathf.Abs(eventData.delta.x), deltaLimit.LeftSize);
+                x = -Mathf.Min(Mathf.Abs(baseDiff.x), dragObj.LeftSize);
             }
-            else if (0 < eventData.delta.x)
+            else if (0 < baseDiff.x)
             {
-                x = Mathf.Min(eventData.delta.x, deltaLimit.RightSize);
+                x = Mathf.Min(baseDiff.x, dragObj.RightSize);
             }
 
-            if (eventData.delta.y < 0)
+            if (baseDiff.y < 0)
             {
-                y = -Mathf.Min(Mathf.Abs(eventData.delta.y), deltaLimit.TopSize);
+                y = -Mathf.Min(Mathf.Abs(baseDiff.y), dragObj.TopSize);
             }
-            else if (0 < eventData.delta.y)
+            else if (0 < baseDiff.y)
             {
-                y = Mathf.Min(eventData.delta.y, deltaLimit.BottomSize);
+                y = Mathf.Min(baseDiff.y, dragObj.BottomSize);
             }
 
-            eventData.delta = new Vector2(x, y);
+            var result = new Vector2(x, y);
+
+            return result;
         }
     }
 }

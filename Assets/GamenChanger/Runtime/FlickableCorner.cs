@@ -211,7 +211,7 @@ namespace GamenChangerCore
                     // すでにend中なので無視する
                     return;
                 default:
-                    Debug.LogError("unhandled state:" + state);
+                    // Debug.LogError("unhandled state:" + state);
                     state = FlickState.NONE;
                     return;
             }
