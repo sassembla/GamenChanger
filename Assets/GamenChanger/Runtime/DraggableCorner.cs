@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -57,27 +58,12 @@ namespace GamenChangerCore
                     }
 
                     // 親のOnInitializedを着火する
-                    // TODO: handlerのinitializeを行う。
+                    // TODO: 未定。
                     // listener.OnInitialized(
-                    //     One,
                     //     whole.Select(s => s.gameObject).ToArray(),
-                    //     newOne =>
+                    //     go =>
                     //     {
-                    //         // すでに同じオブジェクトが押された後であれば無視する
-                    //         if (newOne == One)
-                    //         {
-                    //             return;
-                    //         }
 
-                    //         var before = One;
-
-                    //         // Oneの更新
-                    //         One = newOne;
-
-                    //         var wholeContents = ExposureAllContents();
-
-                    //         // 親のOnChangedByListenerを着火する
-                    //         listener.OnChangedToOneByHandler(One, before, wholeContents.Select(t => t.gameObject).ToArray());
                     //     }
                     // );
                 }
@@ -117,11 +103,6 @@ namespace GamenChangerCore
 
                 this.contentRectTrans = contentRectTrans;
                 this.initialAnchoredPosition = contentRectTrans.anchoredPosition;
-
-                // // アンカーに基づいて、どこをタッチしたかを上書きする。たぶんなんとかなると思ってるが、、これもズレとして保持した方がいいのかもしれない。
-                // // うーん結局ハイコストだなー、深度に応じて重くなっちゃう。いやだ、、もっと簡単にできるはず、、positionがUI上の位置に変換できるはず。
-                // var currentRectLeftTopAbsPos = Vector2.zero;
-                // GetAbsPosOnCanvas(contentRectTrans.GetComponentInParent<Canvas>(), contentRectTrans.transform, ref currentRectLeftTopAbsPos);
             }
 
             // parentに対してcontentの左上の点がどの位置にあるかをVector2として返す。
@@ -138,27 +119,6 @@ namespace GamenChangerCore
 
                 return new Vector2(contentLeftTopX, contentLeftTopY);
             }
-
-            // 自分がセットされているcanvasに対して左上アンカー位置を取得、、とやろうとしていたが、よく考えたら必要なかったので消した。
-            // private void GetAbsPosOnCanvas(Canvas canvas, Transform current, ref Vector2 distanceFromWorld)
-            // {
-            //     if (current.parent != null)
-            //     {
-            //         var posInParent = GetLeftTopPosInParent(current.parent.GetComponent<RectTransform>(), current.GetComponent<RectTransform>());
-
-            //         distanceFromWorld += posInParent;
-            //         if (current.parent.gameObject == canvas.gameObject)
-            //         {
-            //             var canvasRectTrans = canvas.GetComponent<RectTransform>();
-
-            //             // キャンバスに辿り着いたのでここで計算をしてしまう、leftTopを取るためcanvasサイズのheightから-する。
-            //             distanceFromWorld = new Vector2(distanceFromWorld.x, canvasRectTrans.sizeDelta.y - distanceFromWorld.y);
-            //             return;
-            //         }
-
-            //         GetAbsPosOnCanvas(canvas, current.parent, ref distanceFromWorld);
-            //     }
-            // }
         }
 
         private DragObject dragObject;
@@ -239,7 +199,8 @@ namespace GamenChangerCore
             // 動かす
             Move(dragObject, eventData.position);
 
-            // // 保持しているcornerと関連するcornerに対して、willDisappearとwillAppearを通知する。
+            // TODO: 必要であれば書き換える。
+            // 保持しているcornerと関連するcornerに対して、willDisappearとwillAppearを通知する。
             // NotifyAppearance(eventData.delta);
 
             state = DragState.BEGIN;
@@ -289,9 +250,7 @@ namespace GamenChangerCore
             // 動かす
             Move(dragObject, actualMove);
 
-            // TODO: なんらか「こうなったらこうする」を仕込むとしたら、IDraggableCornerHandlerなんだろうな。
-
-            // //progressの更新を行う
+            // TODO: 必要であれば書き換える。
             // UpdateProgress(actualMoveDir);
         }
 
@@ -330,7 +289,7 @@ namespace GamenChangerCore
             }
 
             // 正常にdragの終了に到達した
-
+            // TODO: 必要であれば書き換える。
 
 
 
