@@ -1848,6 +1848,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7604584019a99430e813bc90456169f1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  gridPoints:
+  - {x: 0.16666667, y: 0.5}
+  - {x: 0.5, y: 0.5}
+  - {x: 0.8333333, y: 0.5}
 --- !u!222 &905657744
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -2714,7 +2718,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 160, y: 60}
+  m_SizeDelta: {x: 100, y: 40.55}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1110013221
 MonoBehaviour:
@@ -3991,7 +3995,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Button
+  m_Text: y or n
 --- !u!222 &1505254087
 CanvasRenderer:
   m_ObjectHideFlags: 0

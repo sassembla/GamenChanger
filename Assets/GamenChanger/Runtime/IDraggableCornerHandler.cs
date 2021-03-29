@@ -1,7 +1,16 @@
+using UnityEngine;
+
 namespace GamenChangerCore
 {
     public interface IDraggableCornerHandler
     {
-        // TODO: devideしてなんか移動可能なマグネティックっぽく扱うか？ とりあえず需要次第。
+        // グリッドを返すと、drag対象がそのグリッドに応じた動きをするようになる。
+        Vector2[] OnInitialized();
+
+        // dragしているオブジェクトがどのグリッドに一番接近しているか通知する。
+        void OnDragApproachingToGrid(int index, GameObject go);
+
+        // dragしているオブジェクトがどのグリッドに接地したか通知する。
+        void OnGrid(int index, GameObject go);
     }
 }
