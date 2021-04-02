@@ -707,8 +707,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a6301d23967b4a16b4b7838a759ed1f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  reactUnitSize: 100
-  moveUnitSize: 350
+  ReactUnitSize: 100
+  MoveUnitSize: 350
   CornerFromLeft: {fileID: 0}
   CornerFromRight: {fileID: 439571361}
   CornerFromTop: {fileID: 0}
@@ -840,8 +840,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a6301d23967b4a16b4b7838a759ed1f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  reactUnitSize: 100
-  moveUnitSize: 350
+  ReactUnitSize: 100
+  MoveUnitSize: 350
   CornerFromLeft: {fileID: 369379731}
   CornerFromRight: {fileID: 1124140274}
   CornerFromTop: {fileID: 0}
@@ -1792,8 +1792,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a6301d23967b4a16b4b7838a759ed1f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  reactUnitSize: 100
-  moveUnitSize: 350
+  ReactUnitSize: 100
+  MoveUnitSize: 350
   CornerFromLeft: {fileID: 1124140274}
   CornerFromRight: {fileID: 0}
   CornerFromTop: {fileID: 0}
@@ -2890,8 +2890,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a6301d23967b4a16b4b7838a759ed1f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  reactUnitSize: 100
-  moveUnitSize: 350
+  ReactUnitSize: 100
+  MoveUnitSize: 350
   CornerFromLeft: {fileID: 439571361}
   CornerFromRight: {fileID: 839176692}
   CornerFromTop: {fileID: 0}

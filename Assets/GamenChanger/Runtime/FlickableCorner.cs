@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -61,45 +62,6 @@ namespace GamenChangerCore
                 OnInitializePotentialDrag(eventData);
                 return;
             }
-
-            // 念の為取っておく、実機ビルドができたらチェックして、必要なくなったら消そう。
-            // Show("OnPointerEnter",
-            //     ("button", eventData.button),// PCだとleft、タップ系だと何が入るんだろう。これは無理っぽいな、、、
-
-            //     ("clickCount", eventData.clickCount),//1
-            //     ("clickTime", eventData.clickTime),// 開始時刻のseconds が floatで取れるっぽい。
-
-            //     ("currentInputModule", eventData.currentInputModule),// 色々な情報が一発で出る、なるほど
-            //     ("delta", eventData.delta),
-
-            //     ("dragging", eventData.dragging),
-            //     ("eligibleForClick", eventData.eligibleForClick),
-
-            //     ("enterEventCamera", eventData.enterEventCamera),
-            //     ("lastPress", eventData.lastPress),
-            //     ("pointerClick", eventData.pointerClick),// nullになる
-            //     ("pointerCurrentRaycast", eventData.pointerCurrentRaycast),
-            //     ("pointerDrag", eventData.pointerDrag),// ここに現在ドラッグしている判定のオブジェクトが入る
-
-
-
-            //     ("pointerEnter", eventData.pointerEnter),// ここに現在ドラッグしている判定のオブジェクトが入る、お、拾えるな、、
-
-
-
-            //     ("pointerId", eventData.pointerId),
-            //     ("pointerPress", eventData.pointerPress),
-            //     ("pointerPressRaycast", eventData.pointerPressRaycast),
-            //     ("position", eventData.position),
-            //     ("pressEventCamera", eventData.pressEventCamera),
-            //     ("pressPosition", eventData.pressPosition),
-            //     ("rawPointerPress", eventData.rawPointerPress),
-            //     ("selectedObject", eventData.selectedObject),
-            //     ("used", eventData.used),
-            //     ("useDragThreshold", eventData.useDragThreshold),// trueになっている。よくわからん
-
-            //     ("scrollDelta", eventData.scrollDelta)// 実際のUIのスクロール距離、0,0から発生
-            // );
         }
 
         public void OnInitializePotentialDrag(PointerEventData eventData)
@@ -178,10 +140,10 @@ namespace GamenChangerCore
             UpdateInitialPos();
 
             // eventDataのパラメータを上書きし、指定のオブジェクトをドラッグしている状態に拘束する
-            ApplyConstraintToDir(flickDir, eventData);
+            var moveDiff = ApplyConstraintToDir(flickDir, eventData);
 
             // 動かす
-            Move(eventData.delta);
+            Move(moveDiff);
 
             // 保持しているcornerと関連するcornerに対して、willDisappearとwillAppearを通知する。
             NotifyAppearance(eventData.delta);
@@ -237,13 +199,10 @@ namespace GamenChangerCore
             }
 
             // eventDataのパラメータを上書きし、指定のオブジェクトをドラッグしている状態に拘束する
-            ApplyConstraintToDir(flickDir, eventData);
+            var moveDiff = ApplyConstraintToDir(flickDir, eventData);
 
             // ドラッグ継続
-            Move(eventData.delta);
-
-            // 始めたflickが許可していない逆方向に突き抜けそう、みたいなのを抑制する
-            ApplyPositionLimitByDirection();
+            Move(moveDiff);
 
             var actualMoveDir = DetectFlickingDirection(eventData.delta);
 
@@ -301,22 +260,24 @@ namespace GamenChangerCore
                     {
                         // flick不成立でのキャンセル中状態。
                         case FlickState.CANCELLING:
-                            // TODO: 戻るところのアニメーションはなんか自由に頑張ってくれってやりたいんだよな、どうするかな。アニメーション用のやつを渡すか。
+                            var cancellingCor = CancellingCor();
 
-                            ResetToInitialPosition();
-
-                            NotifyCancelled();
+                            while (cancellingCor.MoveNext())
+                            {
+                                yield return null;
+                            }
 
                             state = FlickState.NONE;
                             yield break;
 
                         // flick成立、目的位置への移動処理を行っている状態。
                         case FlickState.PROCESSING:
-                            // TODO: 達成するところのアニメーションはなんか自由に頑張ってくれってやりたいんだよな、どうするかな。
+                            var processingCor = ProcessingCor(flickedDir);
 
-                            SetToTargetPosition(flickedDir);
-
-                            NotifyProcessed(flickedDir);
+                            while (processingCor.MoveNext())
+                            {
+                                yield return null;
+                            }
 
                             state = FlickState.NONE;
                             yield break;
@@ -333,6 +294,106 @@ namespace GamenChangerCore
             // animation用のCoroutineを作ってUpdateで回す。
             // こうすることで、不意に画面遷移が発生してもこのGOがなければ事故が発生しないようにする。
             this.animationCor = animationCor();
+        }
+
+        private IEnumerator ProcessingCor(FlickDirection flickedDir)
+        {
+            var done = false;
+
+            Action onDone = () =>
+            {
+                done = true;
+            };
+
+            var cancelled = false;
+            Action onCancelled = () =>
+            {
+                cancelled = true;
+            };
+
+            var moveByUnitSizeVec = Vector2.zero;
+            switch (flickedDir)
+            {
+                case FlickDirection.RIGHT:
+                    moveByUnitSizeVec = new Vector2(MoveUnitSize, 0f);
+                    break;
+                case FlickDirection.LEFT:
+                    moveByUnitSizeVec = new Vector2(-MoveUnitSize, 0f);
+                    break;
+                default:
+                    Debug.LogError("unsupported dir:" + flickedDir);
+                    break;
+            }
+
+            parentHandler.OnProcessAnimationRequired(this, initalPos + moveByUnitSizeVec, onDone, onCancelled);
+
+            while (!cancelled && !done)
+            {
+                yield return null;
+            }
+
+            if (done)
+            {
+                // 位置をfixさせる
+                SetFixedPositionFromInitialPos(moveByUnitSizeVec);
+
+                // 通知を行う
+                NotifyProcessed(flickedDir);
+            }
+            else if (cancelled)
+            {
+                var cancelCor = CancellingCor();
+                while (cancelCor.MoveNext())
+                {
+                    yield return null;
+                }
+            }
+        }
+
+        private IEnumerator CancellingCor()
+        {
+            var done = false;
+            Action onDone = () =>
+            {
+                done = true;
+            };
+
+            // キャンセルアニメーション開始
+            parentHandler.OnCancelAnimationRequired(this, initalPos, onDone);
+
+            while (!done)
+            {
+                yield return null;
+            }
+
+            // 位置をfixさせる
+            ResetToInitialPosition();
+
+            // キャンセル済み通知を行う
+            NotifyCancelled();
+        }
+
+        // 関連するcornerの位置だけを、初期位置から差分だけ移動させる。
+        public void UpdateRelatedCornerPositions()
+        {
+            var diff = currentRectTransform().anchoredPosition - initalPos;
+
+            if (CornerFromLeft != null)
+            {
+                CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + diff;
+            }
+            if (CornerFromRight != null)
+            {
+                CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + diff;
+            }
+            if (CornerFromTop != null)
+            {
+                CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + diff;
+            }
+            if (CornerFromBottom != null)
+            {
+                CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + diff;
+            }
         }
 
         private IEnumerator animationCor;
@@ -376,9 +437,8 @@ namespace GamenChangerCore
             }
         }
 
-        public float reactUnitSize;// 反応サイズ、これを超えたら要素をmoveUnitSizeまで移動させる。
-        public float moveUnitSize;// 反応後移動サイズ
-        // TODO: これがセットされていない場合、サイズから自動算出できるはず、from系がセットしてあれば、、、
+        public float ReactUnitSize;// 反応サイズ、これを超えたら要素をmoveUnitSizeまで移動させる。
+        public float MoveUnitSize;// 反応後移動サイズ
 
 
         // ここに要素がセットしてあればその方向に動作する
@@ -710,38 +770,58 @@ namespace GamenChangerCore
 
 
         // dirを元に、移動できる方向を制限する。
-        private void ApplyConstraintToDir(FlickDirection dir, PointerEventData eventData)
+        private Vector2 ApplyConstraintToDir(FlickDirection dir, PointerEventData eventData)
         {
-            var resultX = 0f;
-            var resultY = 0f;
+            var basePos = eventData.pressPosition;// 押したworld位置
+            var currentPos = eventData.position;// 現在のタッチのworld位置
 
-            // x
+            // 差分
+            var baseDiff = currentPos - basePos;
+
+            var x = baseDiff.x;
+            var y = baseDiff.y;
+
+            // 左右
+            if (dir.HasFlag(FlickDirection.RIGHT) || dir.HasFlag(FlickDirection.LEFT))
             {
-                if (dir.HasFlag(FlickDirection.RIGHT))
+                if (!dir.HasFlag(FlickDirection.RIGHT))
                 {
-                    resultX = eventData.delta.x;
+                    // 右フリックはできない前提
+                    x = Mathf.Min(0, x);
                 }
-
-                if (dir.HasFlag(FlickDirection.LEFT))
+                if (!dir.HasFlag(FlickDirection.LEFT))
                 {
-                    resultX = eventData.delta.x;
+                    // 左フリックはできない前提
+                    x = Mathf.Max(0, x);
                 }
             }
-
-            // y
+            else
             {
-                if (dir.HasFlag(FlickDirection.DOWN))
-                {
-                    resultY = eventData.delta.y;
-                }
-
-                if (dir.HasFlag(FlickDirection.UP))
-                {
-                    resultY = eventData.delta.y;
-                }
+                // 左右には動かない
+                x = 0;
             }
 
-            eventData.delta = new Vector2(resultX, resultY);
+            // 上下
+            if (dir.HasFlag(FlickDirection.DOWN) || dir.HasFlag(FlickDirection.UP))
+            {
+                if (!dir.HasFlag(FlickDirection.DOWN))
+                {
+                    // 下フリックはできない前提
+                    y = Mathf.Max(0, y);
+                }
+                if (!dir.HasFlag(FlickDirection.UP))
+                {
+                    // 上フリックはできない前提
+                    y = Mathf.Min(0, y);
+                }
+            }
+            else
+            {
+                // 上下には動かない
+                y = 0;
+            }
+
+            return new Vector2(x, y);
         }
 
 
@@ -791,30 +871,6 @@ namespace GamenChangerCore
             }
         }
 
-        // 結果的にどちらの方向にflickしたかで、自身と各コーナーの位置を最終目的地へとセットする
-        private void SetToTargetPosition(FlickDirection resultDir)
-        {
-            // flickDir で変化させるが、まあどっちに向かっているかで最終値が違う。
-            var moveByUnitSizeVec = Vector2.zero;
-
-            // 結果値が必要になった。
-            switch (resultDir)
-            {
-                case FlickDirection.RIGHT:
-                    moveByUnitSizeVec = new Vector2(moveUnitSize, 0f);
-                    break;
-                case FlickDirection.LEFT:
-                    moveByUnitSizeVec = new Vector2(-moveUnitSize, 0f);
-                    break;
-                default:
-                    Debug.LogError("まだサポートしてない resultDir:" + resultDir);
-                    break;
-            }
-
-            // このCornerと関連Cornerの最終位置を確定させる。
-            SetFixedPositionFromInitialPos(moveByUnitSizeVec);
-        }
-
         // 初期位置から換算した差分を与えて、このCornerと関連するCornerの位置を確定させる。
         private void SetFixedPositionFromInitialPos(Vector2 diff)
         {
@@ -857,40 +913,32 @@ namespace GamenChangerCore
             }
         }
 
-
-
-        // TODO: この方法だとdeltaが足し算になってしまってこれは誤差がすごそう、、うーん、、、まあ実機でやってみよう -> やってみた感じ、フリック開始からちょっとだけでもいいから加速があった方がそれぽい。さてどうやって加速を作り出せるようにするかというと、速度か。
-        // 精度はイマイチなので何かしら手を加えたいところ。加速度に応じた離れと吸着をやれば良さそう。やっぱり多重な点か。ここもアニメーション可能なように挟み込みたいところ。
-        // 本当はmove towardsな感じで、タッチ位置のbefore-afterをみるのが良さそう。
-        // TODO: あとそもそもタッチポイントがダイレクトに領域をその動かす対象とするのが気持ち悪いんだよな、、、中間体があったほうがいい気がする。
-        private void Move(Vector2 delta)
+        private void Move(Vector2 moveDiff)
         {
-            currentRectTransform().anchoredPosition += delta;
-
-            var diff = currentRectTransform().anchoredPosition - initalPos;
+            currentRectTransform().anchoredPosition = initalPos + moveDiff;
 
             // 作用を受けるcornerの位置も、上記のdiffをもとに動作させる
             switch (flickDir)
             {
                 case FlickDirection.RIGHT | FlickDirection.LEFT:
-                    CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + diff;
-                    CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + diff;
+                    CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + moveDiff;
+                    CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + moveDiff;
                     break;
                 case FlickDirection.RIGHT:
-                    CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + diff;
+                    CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + moveDiff;
                     break;
                 case FlickDirection.LEFT:
-                    CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + diff;
+                    CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + moveDiff;
                     break;
                 case FlickDirection.UP | FlickDirection.DOWN:
-                    CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + diff;
-                    CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + diff;
+                    CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + moveDiff;
+                    CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + moveDiff;
                     break;
                 case FlickDirection.UP:
-                    CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + diff;
+                    CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + moveDiff;
                     break;
                 case FlickDirection.DOWN:
-                    CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + diff;
+                    CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + moveDiff;
                     break;
                 default:
                     Debug.LogError("unsupported flickDir:" + flickDir);
@@ -959,7 +1007,7 @@ namespace GamenChangerCore
             // 横方向
             if (xDist != 0)
             {
-                var progress = Mathf.Abs(xDist) / reactUnitSize;
+                var progress = Mathf.Abs(xDist) / ReactUnitSize;
 
                 var appearProgress = Mathf.Min(1f, progress);
                 var disappearProgress = Mathf.Max(0f, 1.0f - progress);
@@ -991,7 +1039,7 @@ namespace GamenChangerCore
             // 縦方向
             if (yDist != 0)
             {
-                var progress = Mathf.Abs(yDist) / reactUnitSize;
+                var progress = Mathf.Abs(yDist) / ReactUnitSize;
 
                 var appearProgress = Mathf.Min(1f, progress);
                 var disappearProgress = Mathf.Max(0f, 1.0f - progress);
@@ -1052,22 +1100,22 @@ namespace GamenChangerCore
             var xDist = initalPos.x - currentRectTransform().anchoredPosition.x;
             var yDist = initalPos.y - currentRectTransform().anchoredPosition.y;
 
-            if (flickDir.HasFlag(FlickDirection.RIGHT) && reactUnitSize <= -xDist)
+            if (flickDir.HasFlag(FlickDirection.RIGHT) && ReactUnitSize <= -xDist)
             {
                 return FlickDirection.RIGHT;
             }
 
-            if (flickDir.HasFlag(FlickDirection.LEFT) && reactUnitSize <= xDist)
+            if (flickDir.HasFlag(FlickDirection.LEFT) && ReactUnitSize <= xDist)
             {
                 return FlickDirection.LEFT;
             }
 
-            if (flickDir.HasFlag(FlickDirection.UP) && reactUnitSize <= -yDist)
+            if (flickDir.HasFlag(FlickDirection.UP) && ReactUnitSize <= -yDist)
             {
                 return FlickDirection.UP;
             }
 
-            if (flickDir.HasFlag(FlickDirection.DOWN) && reactUnitSize <= yDist)
+            if (flickDir.HasFlag(FlickDirection.DOWN) && ReactUnitSize <= yDist)
             {
                 return FlickDirection.DOWN;
             }
@@ -1077,6 +1125,7 @@ namespace GamenChangerCore
         }
 
         // 関連するCornerの位置を更新する
+        // 再帰的に関連するcornerの関連、、までを移動させる。
         private void UpdateRelatedCornerPositions(FlickableCorner flickedSource, Vector2 movedVector)
         {
             // 関連するCornerの要素も連鎖させて移動させる。呼び出し元のオブジェクトと同じオブジェクトはすでに移動済なので移動させない。

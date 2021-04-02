@@ -225,7 +225,7 @@ GameObject:
   - component: {fileID: 8457654664236742428}
   - component: {fileID: 1335414930356571522}
   m_Layer: 5
-  m_Name: FrickableCorner
+  m_Name: FrickableCornerPrefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -263,10 +263,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a6301d23967b4a16b4b7838a759ed1f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  containedUIComponents: []
-  currentRectTransform: {fileID: 0}
-  reactUnitSize: 100
-  moveUnitSize: 350
+  ReactUnitSize: 100
+  MoveUnitSize: 350
   CornerFromLeft: {fileID: 0}
   CornerFromRight: {fileID: 0}
   CornerFromTop: {fileID: 0}

@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -229,6 +230,8 @@ namespace GamenChangerCore
                 return;
             }
 
+            // TODO: このへんにmouse使ってて画面外みたいなのが必要
+
             // dragの方向制約処理を行う
             var actualMove = LimitDragValue(eventData, dragObject);
 
@@ -359,20 +362,23 @@ namespace GamenChangerCore
                     {
                         // 終了処理中
                         case DragState.RELEASING:
-                            // TODO: 達成するところのアニメーションはなんか自由に頑張ってくれってやりたいんだよな、どうするかな。
+                            var cancelCor = CancellingCor(candidatePointIndex);
+                            while (cancelCor.MoveNext())
+                            {
+                                yield return null;
+                            }
 
                             ResetToInitialPosition(dragObject);
+                            listener.OnCancelled(candidatePointIndex, dragObject.contentRectTrans.gameObject);
 
                             SetToNone();
                             yield break;
                         case DragState.APPROACHING:
-                            // TODO: 達成するところのアニメーションはなんか自由に頑張ってくれってやりたいんだよな、どうするかな。
-
-                            // 位置をfixさせる
-                            SetToTargetPosition(dragObject, approachTargetPoint);
-
-                            // 通知を行う
-                            listener.OnGrid(candidatePointIndex, dragObject.contentRectTrans.gameObject);
+                            var cor = ApproachingCor(approachTargetPoint, candidatePointIndex);
+                            while (cor.MoveNext())
+                            {
+                                yield return null;
+                            }
 
                             SetToNone();
                             yield break;
@@ -389,6 +395,68 @@ namespace GamenChangerCore
             // animation用のCoroutineを作ってUpdateで回す。
             // こうすることで、不意に画面遷移が発生してもこのGOがなければ事故が発生しないようにする。
             this.animationCor = animationCor();
+        }
+
+        private IEnumerator ApproachingCor(Vector2 approachTargetPoint, int candidatePointIndex)
+        {
+            var done = false;
+            Action onDone = () =>
+            {
+                done = true;
+            };
+
+            var cancelled = false;
+            Action onCancelled = () =>
+            {
+                cancelled = true;
+            };
+
+            listener.OnApproachAnimationRequired(candidatePointIndex, dragObject.contentRectTrans.gameObject, approachTargetPoint, onDone, onCancelled);
+
+            while (!cancelled && !done)
+            {
+                yield return null;
+            }
+
+            if (done)
+            {
+                // 位置をfixさせる
+                SetToTargetPosition(dragObject, approachTargetPoint);
+
+                // 通知を行う
+                listener.OnGrid(candidatePointIndex, dragObject.contentRectTrans.gameObject);
+            }
+            else if (cancelled)
+            {
+                var cancelCor = CancellingCor(candidatePointIndex);
+                while (cancelCor.MoveNext())
+                {
+                    yield return null;
+                }
+            }
+        }
+
+        private IEnumerator CancellingCor(int candidatePointIndex)
+        {
+            var done = false;
+            Action onDone = () =>
+            {
+                done = true;
+            };
+
+            // キャンセルアニメーション開始
+            listener.OnCancelAnimationRequired(dragObject.contentRectTrans.gameObject, dragObject.initialAnchoredPosition, onDone);
+
+            while (!done)
+            {
+                yield return null;
+            }
+
+            // 位置をfixさせる
+            ResetToInitialPosition(dragObject);
+
+            // 通知を行う
+            listener.OnCancelled(candidatePointIndex, dragObject.contentRectTrans.gameObject);
         }
 
         private IEnumerator animationCor;

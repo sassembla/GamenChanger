@@ -78,7 +78,7 @@ namespace GamenChangerCore
                 // 右に行く場合、最後にtoが入っているので、その分移動する必要がないので除外する
                 var stepList = flickableSteps.ToList();
                 stepList.Remove(stepList.Last());
-                totalDriveLength = -stepList.Sum(step => ((FlickableCorner)step).moveUnitSize);
+                totalDriveLength = -stepList.Sum(step => ((FlickableCorner)step).MoveUnitSize);
             }
             else if (flickableSteps[0].CornerFromLeft == flickableSteps[1])
             {
@@ -87,7 +87,7 @@ namespace GamenChangerCore
                 // 左に行く場合、現在の原点から最初の画面の移動幅を減らす必要がないので除外する。
                 var stepList = flickableSteps.ToList();
                 stepList.Remove(stepList[0]);
-                totalDriveLength = stepList.Sum(step => ((FlickableCorner)step).moveUnitSize);
+                totalDriveLength = stepList.Sum(step => ((FlickableCorner)step).MoveUnitSize);
             }
             else if (flickableSteps[0].CornerFromBottom == flickableSteps[1])
             {

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using GamenChangerCore;
 using UnityEngine;
 using UnityEngine.UI;
@@ -27,7 +28,6 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
     public void DidAppear(FlickableCorner flickableCorner)
     {
         Debug.Log("DidAppear:" + flickableCorner);
-
         switch (flickableCorner.name)
         {
             case "FrickableCorner1":
@@ -140,5 +140,51 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
             }
             return;
         }
+    }
+
+    public void OnProcessAnimationRequired(FlickableCorner flickableCorner, Vector2 targetPosition, Action onDone, Action onCancelled)
+    {
+        var rectTrans = flickableCorner.GetComponent<RectTransform>();
+        IEnumerator process()
+        {
+            var count = 0;
+            while (true)
+            {
+                rectTrans.anchoredPosition = rectTrans.anchoredPosition + (targetPosition - rectTrans.anchoredPosition) * 0.5f;
+                flickableCorner.UpdateRelatedCornerPositions();
+
+                if (count == 10)
+                {
+                    onDone();
+                    yield break;
+                }
+                count++;
+                yield return null;
+            }
+        }
+        StartCoroutine(process());
+    }
+
+    public void OnCancelAnimationRequired(FlickableCorner flickableCorner, Vector2 initialPosition, Action onDone)
+    {
+        var rectTrans = flickableCorner.GetComponent<RectTransform>();
+        IEnumerator cancel()
+        {
+            var count = 0;
+            while (true)
+            {
+                rectTrans.anchoredPosition = rectTrans.anchoredPosition + (initialPosition - rectTrans.anchoredPosition) * 0.5f;
+                flickableCorner.UpdateRelatedCornerPositions();
+
+                if (count == 10)
+                {
+                    onDone();
+                    yield break;
+                }
+                count++;
+                yield return null;
+            }
+        }
+        StartCoroutine(cancel());
     }
 }
