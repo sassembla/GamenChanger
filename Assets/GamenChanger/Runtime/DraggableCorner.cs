@@ -6,6 +6,9 @@ using UnityEngine.EventSystems;
 
 namespace GamenChangerCore
 {
+    // TODO: 複数のdraggableどうしが重なるのを許すかどうか -> 需要が見合ってないのでやらない
+    // TODO: constraint
+    // TODO: 既にgridに要素があったらreject？ -> 難しそうだからやらない
     public class DraggableCorner : Corner
     {
         private enum DragState
@@ -22,7 +25,7 @@ namespace GamenChangerCore
         private DragState state;
 
         private IDraggableCornerHandler listener;
-        private Vector2[] gridPoints;
+        private Vector2[] gridPoints = new Vector2[0];
 
         public new void Awake()
         {
@@ -41,7 +44,7 @@ namespace GamenChangerCore
             listener = listenerCandidate;
 
             // baseの初期化時に実行する関数としてこのクラスの初期化処理をセット
-            base.SetSubclassReloadAction(
+            base.SetSubclassReloadAndExcludedAction(
                 () =>
                 {
                     var whole = ExposureAllContents();
@@ -61,11 +64,41 @@ namespace GamenChangerCore
                     }
 
                     // 親のOnInitializedを着火する
-                    var gridPointSources = listener.OnInitialized();
+                    var gridPointSources = listener.OnDraggableCornerInitialized(
+                        (fromIndex, toIndex) =>
+                        {
+                            // TODO: コレはもしかすると対象のcornerが返せれば、それでいいのかもしれないが、それなら参照で持ってれば呼べるよねになるので難しい。どちらも問題を解決しない。
+                            // driverが発見できればそれを返す
+                            if (TryGetDriver(fromIndex, toIndex, out var driver))
+                            {
+                                return driver;
+                            }
+                            return null;
+                        }
+                    );
 
-                    // このオブジェクトの幅、高さから、gridPointを生成する。
-                    var cirrentSize = currentRectTransform().sizeDelta;
-                    this.gridPoints = gridPointSources.Select(g => new Vector2(g.x * cirrentSize.x, g.y * cirrentSize.y)).ToArray();
+                    if (gridPointSources != null)
+                    {
+                        // このオブジェクトの幅、高さから、gridPointを生成する。
+                        var currentSize = currentRectTransform().sizeDelta;
+                        this.gridPoints = gridPointSources.Select(g => new Vector2(g.x * currentSize.x, g.y * currentSize.y)).ToArray();
+                        return;
+                    }
+
+                    // grid point is null.
+                    Debug.LogError("should set at least 1 point for drag target grid, e,g, return new Vector2[] { new Vector2(0.5f, 0.5f) }; makes the grid for center of the Draggable Corner.");
+                },
+                excludedGameObjectsFromCorner =>
+                {
+                    // excludeされた要素が発見されたので、削除を行う。
+                    foreach (var excludedGameObjectFromCorner in excludedGameObjectsFromCorner)
+                    {
+                        // excludeされた対象の中でDraggableAgentを含んでいるものが見つかったので除外する。
+                        if (excludedGameObjectFromCorner.TryGetComponent<DraggableAgent>(out var target))
+                        {
+                            Destroy(target);
+                        }
+                    }
                 }
             );
 
@@ -89,7 +122,7 @@ namespace GamenChangerCore
                     親の幅からのアンカーで原点位置が変わる、pivotは重心。なので、x,y位置とかは、
                     centerX = 親のwidth * anchor min.x で決まる。
                     centerY = 親のheight * anchor min.y で決まる。
-                
+
                     これがコンテンツの中心x,yになるので、ここからそれぞれコンテンツのwidth、heightをpivotの偏りだけ移動させた値が必要になる。
                 */
 
@@ -238,7 +271,7 @@ namespace GamenChangerCore
             // 動かす
             Move(dragObject, actualMove);
 
-            if (gridPoints != null && gridPoints.Any())
+            if (gridPoints.Any())
             {
                 var candidatePointIndex = -1;
 
@@ -313,7 +346,7 @@ namespace GamenChangerCore
             */
             var candidatePointIndex = -1;
             var diff = Vector2.zero;// 差分にすることで最短距離分だけ移動すればいいことにしている。
-            if (gridPoints != null && gridPoints.Any())
+            if (gridPoints.Any())
             {
                 // オブジェクトの中心位置を取得する
                 var centerPos = GetLeftTopPosInParent(currentRectTransform(), dragObject.contentRectTrans) + (dragObject.contentRectTrans.sizeDelta / 2);
@@ -369,7 +402,7 @@ namespace GamenChangerCore
                             }
 
                             ResetToInitialPosition(dragObject);
-                            listener.OnCancelled(candidatePointIndex, dragObject.contentRectTrans.gameObject);
+                            listener.OnDragCancelled(candidatePointIndex, dragObject.contentRectTrans.gameObject);
 
                             SetToNone();
                             yield break;
@@ -411,7 +444,7 @@ namespace GamenChangerCore
                 cancelled = true;
             };
 
-            listener.OnApproachAnimationRequired(candidatePointIndex, dragObject.contentRectTrans.gameObject, approachTargetPoint, onDone, onCancelled);
+            listener.OnDragApproachAnimationRequired(candidatePointIndex, dragObject.contentRectTrans.gameObject, approachTargetPoint, onDone, onCancelled);
 
             while (!cancelled && !done)
             {
@@ -424,7 +457,7 @@ namespace GamenChangerCore
                 SetToTargetPosition(dragObject, approachTargetPoint);
 
                 // 通知を行う
-                listener.OnGrid(candidatePointIndex, dragObject.contentRectTrans.gameObject);
+                listener.OnDragDoneOnGrid(candidatePointIndex, dragObject.contentRectTrans.gameObject);
             }
             else if (cancelled)
             {
@@ -445,7 +478,7 @@ namespace GamenChangerCore
             };
 
             // キャンセルアニメーション開始
-            listener.OnCancelAnimationRequired(dragObject.contentRectTrans.gameObject, dragObject.initialAnchoredPosition, onDone);
+            listener.OnDragCancelAnimationRequired(dragObject.contentRectTrans.gameObject, dragObject.initialAnchoredPosition, onDone);
 
             while (!done)
             {
@@ -456,7 +489,62 @@ namespace GamenChangerCore
             ResetToInitialPosition(dragObject);
 
             // 通知を行う
-            listener.OnCancelled(candidatePointIndex, dragObject.contentRectTrans.gameObject);
+            listener.OnDragCancelled(candidatePointIndex, dragObject.contentRectTrans.gameObject);
+        }
+
+
+        private bool TryGetDriver(int fromIndex, int toIndex, out GamenDriver driver)
+        {
+            driver = null;
+
+            // 現在対象のgridに載っているfromを見つけてくる
+            if (!gridPoints.Any())
+            {
+                return false;
+            }
+
+            var distance = float.PositiveInfinity;
+            var gridPoint = gridPoints[fromIndex];
+            RectTransform candidatePointContentRectTrans = null;
+            var toPosition = gridPoints[toIndex];
+            var diff = Vector2.zero;// オブジェクトの中心位置と目的のgridの位置の差を取り、UI座標上での移動に利用する。
+            foreach (var contentRectTrans in ExposureAllContents())
+            {
+                // オブジェクトの中心位置を取得する
+                var centerPos = GetLeftTopPosInParent(currentRectTransform(), contentRectTrans) + (contentRectTrans.sizeDelta / 2);
+
+                var current = Vector2.Distance(gridPoint, centerPos);
+                if (current < distance)
+                {
+                    // 一番近いrectTrans候補を更新
+                    candidatePointContentRectTrans = contentRectTrans;
+
+                    // 目的値に対しての移動のために、diffを取得する。
+                    diff = toPosition - centerPos;
+                }
+                else if (current == distance)
+                {
+                    // 同じ距離のものが出た場合、先勝ちにする。
+                    break;
+                }
+
+                distance = current;
+            }
+
+            if (candidatePointContentRectTrans != null)
+            {
+                driver = new GamenDriver(
+                    candidatePointContentRectTrans,
+                    diff,
+                    drivenRectTrans =>
+                    {
+                        listener.OnDragDoneOnGrid(toIndex, candidatePointContentRectTrans.gameObject);
+                    }
+                );
+                return true;
+            }
+
+            return false;
         }
 
         private IEnumerator animationCor;

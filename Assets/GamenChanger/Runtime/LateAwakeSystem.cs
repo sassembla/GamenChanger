@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -25,9 +26,9 @@ namespace GamenChangerCore
                         uninitialize.ReloadCorner();
                     }
                 }
-                catch
+                catch (Exception e)
                 {
-                    Debug.LogError("failed to execute ReloadCorner of:" + uninitialized[0]);
+                    Debug.LogError("failed to execute ReloadCorner of:" + uninitialized[0] + " e:" + e);
                 }
 
                 uninitialized.RemoveAt(0);

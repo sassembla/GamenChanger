@@ -1,17 +1,21 @@
 namespace GamenChangerCore
 {
+    // TODO: なんか名前が気に食わない、CornerなんとかHandlerだろうな
     public interface ICornerContent
     {
-        void Touch();
+        void CornerTouchDetected();
 
-        void WillAppear();
-        void AppearProgress(float progress);
-        void AppearCancelled();
-        void DidAppear();
+        void CornerAppearProgress(float progress);
 
-        void WillDisappear();
-        void DisppearProgress(float progress);
-        void DisppearCancelled();
-        void DidDisappear();
+        void CornerWillAppear();
+        void CornerWillCancel();// TODO: 名前をなんとかしたい
+        void CornerWillBack();// TODO: 名前をなんとかしたい
+        void CornerAppearCancelled();
+        void CornerDidAppear();
+
+        void CornerWillDisappear();
+        void CornerDisppearProgress(float progress);
+        void CornerDisppearCancelled();
+        void CornerDidDisappear();
     }
 }

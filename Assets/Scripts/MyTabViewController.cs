@@ -12,7 +12,7 @@ public class MyTabViewController : MonoBehaviour, IOneOfNCornerHandler
     public Corner corner3rd;
     public Action<GameObject> setToOneOfNAct;
 
-    public void OnInitialized(GameObject one, GameObject[] all, Action<GameObject> setToOneOfNAct)
+    public void OnOneOfNCornerReloaded(GameObject one, GameObject[] all, Action<GameObject> setToOneOfNAct)
     {
         // UIの調整
         foreach (var a in all)
@@ -50,7 +50,7 @@ public class MyTabViewController : MonoBehaviour, IOneOfNCornerHandler
         this.setToOneOfNAct = setToOneOfNAct;
     }
 
-    public void OnChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all)
+    public void OnOneOfNChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all)
     {
         // UIの調整
         foreach (var a in all)
@@ -86,7 +86,7 @@ public class MyTabViewController : MonoBehaviour, IOneOfNCornerHandler
         }
     }
 
-    public void OnChangedToOneByHandler(GameObject one, GameObject before, GameObject[] all)
+    public void OnOneOfNChangedToOneByHandler(GameObject one, GameObject before, GameObject[] all)
     {
         // UIの調整
         foreach (var a in all)

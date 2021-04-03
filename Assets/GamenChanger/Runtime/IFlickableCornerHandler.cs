@@ -8,23 +8,25 @@ namespace GamenChangerCore
         // handlers
         void OnFlickRequestFromFlickableCorner(FlickableCorner flickableCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir);
 
-        void Touch(FlickableCorner flickableCorner);
+        void TouchOnFlickableCornerDetected(FlickableCorner flickableCorner);
 
-        void WillAppear(FlickableCorner flickableCorner);
-        void AppearProgress(FlickableCorner flickableCorner, float progress);
-        void AppearCancelled(FlickableCorner flickableCorner);
-        void DidAppear(FlickableCorner flickableCorner);
+        void FlickableCornerWillAppear(FlickableCorner flickableCorner);
+        void FlickableCornerAppearProgress(FlickableCorner flickableCorner, float progress);
+        void FlickableCornerWillBack(FlickableCorner flickableCorner);// TODO: 名前をなんとかする
+        void FlickableCornerWillCancel(FlickableCorner flickableCorner);// TODO: 名前をなんとかする
+        void FlickableCornerAppearCancelled(FlickableCorner flickableCorner);
+        void FlickableCornerDidAppear(FlickableCorner flickableCorner);
 
-        void WillDisappear(FlickableCorner flickableCorner);
-        void DisppearProgress(FlickableCorner flickableCorner, float progress);
-        void DisppearCancelled(FlickableCorner flickableCorner);
-        void DidDisappear(FlickableCorner flickableCorner);
+        void FlickableCornerWillDisappear(FlickableCorner flickableCorner);
+        void FlickableCornerDisppearProgress(FlickableCorner flickableCorner, float progress);
+        void FlickableCornerDisppearCancelled(FlickableCorner flickableCorner);
+        void FlickableCornerDidDisappear(FlickableCorner flickableCorner);
 
 
         // animations
 
-        void OnProcessAnimationRequired(FlickableCorner flickableCorner, Vector2 targetPosition, Action onDone, Action onCancelled);
-        void OnCancelAnimationRequired(FlickableCorner flickableCorner, Vector2 initialPosition, Action onDone);
+        void OnFlickProcessAnimationRequired(FlickableCorner flickableCorner, Vector2 targetPosition, Action onDone, Action onCancelled);
+        void OnFlickCancelAnimationRequired(FlickableCorner flickableCorner, Vector2 initialPosition, Action onDone);
 
     }
 }

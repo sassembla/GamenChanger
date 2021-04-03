@@ -4,5 +4,8 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/ComplexViewSample.unity
+    guid: 6a815eadcc42248e794907bfb1ccd5e4
   m_configObjects: {}

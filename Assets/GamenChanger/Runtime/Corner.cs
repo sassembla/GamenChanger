@@ -12,11 +12,12 @@ namespace GamenChangerCore
         フリック可能にしてみる -> できた
         OneOfNを作ってみる -> できた
         prefabを使ったcorner生成のフローなどをつくってみる -> できた
-        TODO: sequeがあるFlickableViewを作ってみる
+        sequeがあるFlickableViewを作ってみる -> できた
+        TODO: draggableなsequeがあるFlickableViewを作ってみる
     */
     public class Corner : MonoBehaviour
     {
-        private RectTransform[] containedUIComponents = null;
+        protected RectTransform[] containedUIComponents = null;
 
         public RectTransform currentRectTransform()
         {
@@ -60,24 +61,48 @@ namespace GamenChangerCore
             var childCount = transform.childCount;
             var childUIComponent = new List<RectTransform>();
 
+            var excludedGameObjects = new List<GameObject>();
+
             // UIBehaviourの性質を持つコンポーネントのRectTransformを集める。
             for (var i = 0; i < childCount; i++)
             {
                 var trans = transform.GetChild(i);
+
+                // excludeされるGOであれば無視する。
+                if (excludeObjects.Contains(trans.gameObject))
+                {
+                    excludedGameObjects.Add(trans.gameObject);
+                    continue;
+                }
+
                 if (trans.TryGetComponent<UIBehaviour>(out var uiComponet))
                 {
+                    // excludeされるコンポーネント要素であれば無視する。
+                    if (excludeTypes.Contains(uiComponet.GetType()))
+                    {
+                        excludedGameObjects.Add(trans.gameObject);
+                        continue;
+                    }
+
                     childUIComponent.Add(uiComponet.GetComponent<RectTransform>());
                 }
             }
 
             containedUIComponents = childUIComponent.ToArray();
+
+            if (excludedGameObjects.Any())
+            {
+                onExcludedGameObjectsFound(excludedGameObjects.ToArray());
+            }
         }
 
         private Action additionalReloadAct;
+        private Action<GameObject[]> onExcludedGameObjectsFound;
         // サブクラスからのみ使うのを想定して、cornerのreload時に追加で呼ばれるreload actionをセットする。
-        protected internal void SetSubclassReloadAction(Action additional)
+        protected internal void SetSubclassReloadAndExcludedAction(Action additional, Action<GameObject[]> onExcludedGameObjectFound)
         {
             this.additionalReloadAct = additional;
+            this.onExcludedGameObjectsFound = onExcludedGameObjectFound;
         }
 
 
@@ -183,11 +208,87 @@ namespace GamenChangerCore
 
         // prefabを元にしたSwap
         // TODO: これはまるっとinstantiateすれば済むかもな~とも思った。これをどこかから実行する方が楽ぽい？
-        public void SetContentsFromPrefab(GameObject prefab)
+        public void InstantiateContentsFromPrefab(GameObject prefab)
         {
-            // TODO: prefabじゃない場合
+            // TODO: prefabじゃない場合になんとかする必要がある。WIP。
         }
 
+        private List<Type> excludeTypes = new List<Type>();
+
+        // 特定の型のContentをこのCornerの要素から除外する
+        public void ExcludeContents<T>() where T : UIBehaviour
+        {
+            var excludeType = typeof(T);
+            if (excludeTypes.Contains(excludeType))
+            {
+                // 既に含んでいるので何もしない
+                return;
+            }
+
+            excludeTypes.Add(excludeType);
+            ReloadContainedComponent();
+        }
+
+        // 特定のCorner型をこのCornerの要素から除外する
+        public void ExcludeCorners<T>() where T : Corner
+        {
+            var excludeType = typeof(T);
+            if (excludeTypes.Contains(excludeType))
+            {
+                // 既に含んでいるので何もしない
+                return;
+            }
+
+            excludeTypes.Add(excludeType);
+            ReloadContainedComponent();
+        }
+
+        // 現在除外設定されている型の一覧を返す
+        public Type[] ExcludingTypes()
+        {
+            return excludeTypes.ToArray();
+        }
+
+        private List<GameObject> excludeObjects = new List<GameObject>();
+
+        // 特定のコンポーネント群をこのCornerから明示的に除外する
+        public void ExcludeContents<T>(T[] excludeTargetComponents) where T : UIBehaviour
+        {
+            foreach (var excludeTargetComponent in excludeTargetComponents)
+            {
+                var excludeGO = excludeTargetComponent.gameObject;
+                if (excludeObjects.Contains(excludeGO))
+                {
+                    // 既に含んでいるので何もしない
+                    continue;
+                }
+
+                excludeObjects.Add(excludeGO);
+            }
+
+            // まとめて一度だけ実行する。
+            ReloadContainedComponent();
+        }
+
+        // 特定のコンポーネントをこのCornerから明示的に除外する
+        public void ExcludeContent<T>(T excludeTargetComponent) where T : UIBehaviour
+        {
+            var excludeGO = excludeTargetComponent.gameObject;
+            if (excludeObjects.Contains(excludeGO))
+            {
+                // 既に含んでいるので何もしない
+                return;
+            }
+
+            excludeObjects.Add(excludeGO);
+            ReloadContainedComponent();
+        }
+
+        // 現在除外設定されているGameObjectの一覧を返す
+        public GameObject[] ExcludingGameObjects()
+        {
+            return excludeObjects.ToArray();
+        }
 
 
         // Cornerが保持しているコンテンツ一覧を返す

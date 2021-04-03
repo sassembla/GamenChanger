@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -24,6 +25,8 @@ namespace GamenChangerCore
         public GameObject One;
 
         private IOneOfNCornerHandler listener;
+
+        private bool needReload = false;
 
         public new void Awake()
         {
@@ -55,52 +58,88 @@ namespace GamenChangerCore
             listener = listenerCandidate;
 
             // baseの初期化時に実行する関数としてこのクラスの初期化処理をセット
-            base.SetSubclassReloadAction(
+            base.SetSubclassReloadAndExcludedAction(
                 () =>
                 {
-                    var whole = ExposureAllContents();
+                    ReloadOneOfNCorner(true);
+                },
+                excludedGameObjectsFromCorner =>
+                {
+                    // OneOfNCornerはコードで選択されている要素を操作するActionをlistenerに提供しているため、
+                    // Actの対象の要素が変更される = 個数が変更されることがあれば、それをActの更新としてlistenerへと伝える必要がある。
+                    var needReload = false;
 
-                    // containedUIComponentsへと自動的にagentを生やす
-                    // TODO: agent勝手に付けるよりももっといい方法があると思うが、、まあはい。
-                    foreach (var content in whole)
+                    // もしexcludeしたい対象に含まれていたら消す
+                    foreach (var excludedGameObjectFromCorner in excludedGameObjectsFromCorner)
                     {
-                        // すでにセット済み
-                        if (content.gameObject.GetComponent<OneOfNAgent>() != null)
+                        if (excludedGameObjectFromCorner.TryGetComponent<OneOfNAgent>(out var target))
                         {
-                            continue;
+                            Destroy(target);
+                            needReload = true;
                         }
-
-                        var agent = content.gameObject.AddComponent<OneOfNAgent>();
-                        agent.parent = this;
                     }
 
-                    // 親のOnInitializedを着火する
-                    listener.OnInitialized(
-                        One,
-                        whole.Select(s => s.gameObject).ToArray(),
-                        newOne =>
-                        {
-                            // すでに同じオブジェクトが押された後であれば無視する
-                            if (newOne == One)
-                            {
-                                return;
-                            }
-
-                            var before = One;
-
-                            // Oneの更新
-                            One = newOne;
-
-                            var wholeContents = ExposureAllContents();
-
-                            // 親のOnChangedByListenerを着火する
-                            listener.OnChangedToOneByHandler(One, before, wholeContents.Select(t => t.gameObject).ToArray());
-                        }
-                    );
+                    // 変更が検知されたのでreload -> lisnterへの通知を行う。
+                    if (needReload)
+                    {
+                        ReloadOneOfNCorner(false);
+                    }
                 }
             );
 
             base.Awake();
+        }
+
+        private void ReloadOneOfNCorner(bool needReExposure)
+        {
+            var whole = new RectTransform[0];
+            if (needReExposure)
+            {
+                whole = ExposureAllContents();
+            }
+            else
+            {
+                whole = containedUIComponents;
+            }
+
+
+            // containedUIComponentsへと自動的にagentを生やす
+            // TODO: agent勝手に付けるよりももっといい方法があると思うが、、まあはい。
+            foreach (var content in whole)
+            {
+                // すでにセット済み
+                if (content.gameObject.GetComponent<OneOfNAgent>() != null)
+                {
+                    continue;
+                }
+
+                var agent = content.gameObject.AddComponent<OneOfNAgent>();
+                agent.parent = this;
+            }
+
+            // 親のOnInitializedを着火する
+            listener.OnOneOfNCornerReloaded(
+                One,
+                whole.Select(s => s.gameObject).ToArray(),
+                newOne =>
+                {
+                    // すでに同じオブジェクトが押された後であれば無視する
+                    if (newOne == One)
+                    {
+                        return;
+                    }
+
+                    var before = One;
+
+                    // Oneの更新
+                    One = newOne;
+
+                    var wholeContents = ExposureAllContents();
+
+                    // 親のOnChangedByListenerを着火する
+                    listener.OnOneOfNChangedToOneByHandler(One, before, wholeContents.Select(t => t.gameObject).ToArray());
+                }
+            );
         }
 
         public void OnPointerUp(PointerEventData eventData)
@@ -121,7 +160,16 @@ namespace GamenChangerCore
             var whole = ExposureAllContents();
 
             // 親のOnChangedを着火する
-            listener.OnChangedToOneByPlayer(One, before, whole.Select(t => t.gameObject).ToArray());
+            listener.OnOneOfNChangedToOneByPlayer(One, before, whole.Select(t => t.gameObject).ToArray());
+        }
+
+        // 現在のOneが何番目のコンテンツかを返す。
+        // Oneが設定されていない場合-1を返す。
+        public int GetIndexOfOne()
+        {
+            var whole = containedUIComponents;
+            var oneRectTrans = One.GetComponent<RectTransform>();
+            return Array.IndexOf(whole, oneRectTrans);
         }
     }
 }

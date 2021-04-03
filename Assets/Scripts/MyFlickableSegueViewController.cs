@@ -8,9 +8,9 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
 {
     public MyFlickDetector flickDetector;
 
-    public void OnInitialized(GameObject one, GameObject[] all, Action<GameObject> setToOneOfNAct)
+    public void OnOneOfNCornerReloaded(GameObject one, GameObject[] all, Action<GameObject> setToOneOfNAct)
     {
-        // sequeが初期化された
+        // segueが初期化された
 
         // UIの調整
         foreach (var a in all)
@@ -32,7 +32,7 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         flickDetector.selectIndicator = index => setToOneOfNAct(all[index]);
     }
 
-    public void OnChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all)
+    public void OnOneOfNChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all)
     {
         // sequeのどれか一つがUI操作によって更新された
 
@@ -99,8 +99,7 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
             }
 
             // sequeが操作されたので、flickableCornerの中でフォーカスしてあるものを変更する。
-            var (isFound, driver) = FlickableCorner.TryFindingAutoFlickRoute(fromFlickableCorner, targetFlickableCorner);
-            if (isFound)
+            if (FlickableCorner.TryFindingAutoFlickRoute(fromFlickableCorner, targetFlickableCorner, out var driver))
             {
                 // TODO: このへんでdriverを持っておくとおもしろそう。stopしたいので、、
                 IEnumerator driveCor()
@@ -117,7 +116,7 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         }
     }
 
-    public void OnChangedToOneByHandler(GameObject one, GameObject before, GameObject[] all)
+    public void OnOneOfNChangedToOneByHandler(GameObject one, GameObject before, GameObject[] all)
     {
         // sequeのどれか一つがhandlerによって更新された
 

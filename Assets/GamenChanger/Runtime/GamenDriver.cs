@@ -18,6 +18,26 @@ namespace GamenChangerCore
             DOWN
         }
 
+        public GamenDriver(RectTransform fromRectTransform, Vector2 targetPosition, Action<RectTransform> onDriven)
+        {
+            state = DriveState.Driving;
+            /*
+                存在するのは
+                1.Corner
+                2.FlickableCorner
+                3.OneOfNCorner
+                4.DraggableCorner
+                5.OverlayCorner
+                の5種で、連続できるのは上2つくらいだなー。まあなんでもCornerの特性を持つので動かして持ってくることは可能。
+
+                どんなパターンが存在するかを調べる。
+                まずサポートできるのは、
+                ・Draggable
+                この1パターン。
+            */
+            this.cor = DraggableDrive(fromRectTransform, targetPosition, onDriven);
+        }
+
         public GamenDriver(Corner[] steps)
         {
             // ここでプランを作る。それをmoveNextがgeneratorとして実行していく。
@@ -42,6 +62,7 @@ namespace GamenChangerCore
                 まずサポートできるのは、
                 ・全てがFlickable
                 ・Flickableから他のCorner
+                ・Draggable(ただしindexオンリー)
                 この2パターン。
             */
 
@@ -63,6 +84,54 @@ namespace GamenChangerCore
             }
 
             throw new Exception("unsupported pattern.");
+        }
+
+        private IEnumerator DraggableDrive(RectTransform draggableTargetContentRectTrans, Vector2 targetPositionSource, Action<RectTransform> onDriven)
+        {
+            var maxCount = 10;// TODO: frameなので、そのまま使うと厄介。
+            var driveDivide = 0.3f;
+
+            IEnumerator cor()
+            {
+                Vector3 targetPosition = targetPositionSource;
+                Vector3 origin = targetPosition;
+
+                var count = 0;
+
+                var totalMove = Vector3.zero;
+
+                // このcorの中では一貫してpositionを使っている。
+                var startPosition = draggableTargetContentRectTrans.position;
+
+                while (true)
+                {
+                    // このフレームでの移動距離を出す
+                    var move = origin * driveDivide;
+                    totalMove += move;
+
+                    // 移動させる
+                    draggableTargetContentRectTrans.position = startPosition + totalMove;
+
+                    // オリジナルを減らす
+                    origin = origin - move;
+
+                    count++;
+                    if (count == maxCount)
+                    {
+                        // 終了するので位置をジャストにする
+                        draggableTargetContentRectTrans.position = startPosition + targetPosition;
+
+                        // Draggableへと通知
+                        onDriven(draggableTargetContentRectTrans);
+
+                        yield break;
+                    }
+
+                    yield return null;
+                }
+            };
+
+            return cor();
         }
 
         private IEnumerator FlickableDrive(FlickableCorner[] flickableSteps)
@@ -106,15 +175,16 @@ namespace GamenChangerCore
                 throw new Exception("direction is unhandled.");
             }
 
-            var maxCount = 30;// TODO: frameなので、そのまま使うと厄介。
+            // TODO: この辺のパラメータも渡せるようにしたいところ。今は内部実装オンリーなので、さてどうするか。対応するflickableのanimation実装があるといいかもなあ。
+            var maxCount = 10;// TODO: frameなので、そのまま使うと厄介。
             var driveDivide = 0.3f;
-            var timeDuration = new WaitForSeconds(0.1f);
 
 
             // 関連する全てのFlickableCornerと関連CornerのrectTransformを収集する。
             var relatedAllFlickableCornerRectTransforms = flickableSteps[0].CollectRelatedFlickableCorners();
 
             // 開始位置を収集
+            // このcorの中では一貫してpositionを使っている。
             var startPositions = relatedAllFlickableCornerRectTransforms.Select(f => new Vector2(f.position.x, f.position.y)).ToArray();
 
             IEnumerator cor()
@@ -150,10 +220,11 @@ namespace GamenChangerCore
                             var trans = relatedAllFlickableCornerRectTransforms[j];
                             trans.position = startPositions[j] + new Vector2(totalDriveLength, 0);
                         }
+                        // TODO: onDrivenを実行する必要がある。
                         yield break;
                     }
 
-                    yield return timeDuration;
+                    yield return null;
                 }
             };
 

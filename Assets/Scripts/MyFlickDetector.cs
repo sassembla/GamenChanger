@@ -15,19 +15,26 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
         また、対象方向へのflick先が存在しない場合、OnFlickRequestFromFlickableCornerが呼び出され、その中でcornerを追加したり接続を切り替えることで
         無限にflick先を生成する、などができる。
     */
-    public void Touch(FlickableCorner flickableCorner)
+    public void TouchOnFlickableCornerDetected(FlickableCorner flickableCorner)
     {
         Debug.Log("Touch:" + flickableCorner);
         // TODO: この辺をどうにかして上位に伝えると、driveのキャンセルができるようになる。
     }
 
-    public void WillAppear(FlickableCorner flickableCorner)
+
+    public void FlickableCornerWillBack(FlickableCorner flickableCorner)
     {
-        Debug.Log("WillAppear:" + flickableCorner);
+        // Debug.Log("FlickableCornerWillBack:" + flickableCorner);
     }
-    public void DidAppear(FlickableCorner flickableCorner)
+
+    public void FlickableCornerWillCancel(FlickableCorner flickableCorner)
     {
-        Debug.Log("DidAppear:" + flickableCorner);
+        // Debug.Log("FlickableCornerWillCancel:" + flickableCorner);
+    }
+
+    public void FlickableCornerWillAppear(FlickableCorner flickableCorner)
+    {
+        // Debug.Log("FlickableCornerWillAppear:" + flickableCorner);
         switch (flickableCorner.name)
         {
             case "FrickableCorner1":
@@ -47,8 +54,12 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
                 break;
         }
     }
+    public void FlickableCornerDidAppear(FlickableCorner flickableCorner)
+    {
+        // Debug.Log("FlickableCornerDidAppear:" + flickableCorner);
+    }
 
-    public void AppearCancelled(FlickableCorner flickableCorner)
+    public void FlickableCornerAppearCancelled(FlickableCorner flickableCorner)
     {
         // Debug.Log("AppearCancelled:" + flickableCorner);
         if (flickableCorner.gameObject.name.Contains("FrickableCornerPrefab"))
@@ -57,17 +68,17 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
             Destroy(flickableCorner.gameObject);
         }
     }
-    public void AppearProgress(FlickableCorner flickableCorner, float progress)
+    public void FlickableCornerAppearProgress(FlickableCorner flickableCorner, float progress)
     {
         // Debug.Log("AppearProgress:" + flickableCorner + " progress:" + progress);
     }
 
 
-    public void WillDisappear(FlickableCorner flickableCorner)
+    public void FlickableCornerWillDisappear(FlickableCorner flickableCorner)
     {
         // Debug.Log("WillDisappear:" + flickableCorner);
     }
-    public void DidDisappear(FlickableCorner flickableCorner)
+    public void FlickableCornerDidDisappear(FlickableCorner flickableCorner)
     {
         // Debug.Log("DidDisappear:" + flickableCorner);
         if (flickableCorner.gameObject.name.Contains("FrickableCornerPrefab"))
@@ -76,11 +87,11 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
             Destroy(flickableCorner.gameObject);
         }
     }
-    public void DisppearCancelled(FlickableCorner flickableCorner)
+    public void FlickableCornerDisppearCancelled(FlickableCorner flickableCorner)
     {
         // Debug.Log("DisppearCancelled:" + flickableCorner);
     }
-    public void DisppearProgress(FlickableCorner flickableCorner, float progress)
+    public void FlickableCornerDisppearProgress(FlickableCorner flickableCorner, float progress)
     {
         // Debug.Log("DisppearProgress:" + flickableCorner + " progress:" + progress);
     }
@@ -142,7 +153,7 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
         }
     }
 
-    public void OnProcessAnimationRequired(FlickableCorner flickableCorner, Vector2 targetPosition, Action onDone, Action onCancelled)
+    public void OnFlickProcessAnimationRequired(FlickableCorner flickableCorner, Vector2 targetPosition, Action onDone, Action onCancelled)
     {
         var rectTrans = flickableCorner.GetComponent<RectTransform>();
         IEnumerator process()
@@ -165,7 +176,7 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
         StartCoroutine(process());
     }
 
-    public void OnCancelAnimationRequired(FlickableCorner flickableCorner, Vector2 initialPosition, Action onDone)
+    public void OnFlickCancelAnimationRequired(FlickableCorner flickableCorner, Vector2 initialPosition, Action onDone)
     {
         var rectTrans = flickableCorner.GetComponent<RectTransform>();
         IEnumerator cancel()

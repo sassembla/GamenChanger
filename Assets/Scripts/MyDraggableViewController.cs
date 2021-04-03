@@ -7,17 +7,17 @@ using UnityEngine.UI;
 public class MyDraggableViewController : MonoBehaviour, IDraggableCornerHandler
 {
     public Vector2[] gridPoints;
-    public Vector2[] OnInitialized()
+    public Vector2[] OnDraggableCornerInitialized(Func<int, int, GamenDriver> getDriver)
     {
         return gridPoints;
     }
 
     public void OnDragApproachingToGrid(int index, GameObject go)
     {
-        OnGrid(index, go);
+        OnDragDoneOnGrid(index, go);
     }
 
-    public void OnGrid(int index, GameObject go)
+    public void OnDragDoneOnGrid(int index, GameObject go)
     {
         var text = go.GetComponentInChildren<Text>();
         switch (index)
@@ -37,12 +37,12 @@ public class MyDraggableViewController : MonoBehaviour, IDraggableCornerHandler
         }
     }
 
-    public void OnCancelled(int index, GameObject go)
+    public void OnDragCancelled(int index, GameObject go)
     {
         Debug.Log("index:" + index + " go:" + go);
     }
 
-    public void OnApproachAnimationRequired(int index, GameObject go, Vector2 approachTargetPosition, Action onDone, Action onCancelled)
+    public void OnDragApproachAnimationRequired(int index, GameObject go, Vector2 approachTargetPosition, Action onDone, Action onCancelled)
     {
         var rectTrans = go.GetComponent<RectTransform>();
         IEnumerator approach()
@@ -63,7 +63,7 @@ public class MyDraggableViewController : MonoBehaviour, IDraggableCornerHandler
         StartCoroutine(approach());
     }
 
-    public void OnCancelAnimationRequired(GameObject go, Vector2 initialPosition, Action onDone)
+    public void OnDragCancelAnimationRequired(GameObject go, Vector2 initialPosition, Action onDone)
     {
         var rectTrans = go.GetComponent<RectTransform>();
         IEnumerator cancel()

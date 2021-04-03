@@ -30,14 +30,19 @@ namespace GamenChangerCore
 
         public new void Awake()
         {
-            base.SetSubclassReloadAction(
+            base.SetSubclassReloadAndExcludedAction(
                 () =>
                 {
                     // 親を探して、IFlickableCornerFocusHandlerを持っているオブジェクトがあったら、変更があるたびに上流に通知を流す。
                     if (transform.parent != null)
                     {
+                        Debug.Log("parentHandler:" + transform.parent);
                         parentHandler = transform.parent.GetComponent<IFlickableCornerHandler>();
                     }
+                },
+                excludedGameObject =>
+                {
+                    // do nothing.
                 }
             );
 
@@ -145,8 +150,6 @@ namespace GamenChangerCore
             // 動かす
             Move(moveDiff);
 
-            // 保持しているcornerと関連するcornerに対して、willDisappearとwillAppearを通知する。
-            NotifyAppearance(eventData.delta);
             // TODO: この時に向かった方向とは逆の方向にdragし、なおかつ初期値を超えたタイミングで、キャンセルを流してなおかつ反対側にあるコンテンツがあればwillAppearを呼び出したい。
 
             state = FlickState.BEGIN;
@@ -245,6 +248,9 @@ namespace GamenChangerCore
             if (isFlicked)
             {
                 state = FlickState.PROCESSING;
+
+                // ここでWillAppear/WillDisappearを流す
+                NotifyAppearance(flickedDir);
             }
             else
             {
@@ -325,7 +331,14 @@ namespace GamenChangerCore
                     break;
             }
 
-            parentHandler.OnProcessAnimationRequired(this, initalPos + moveByUnitSizeVec, onDone, onCancelled);
+            if (parentHandler != null)
+            {
+                parentHandler.OnFlickProcessAnimationRequired(this, initalPos + moveByUnitSizeVec, onDone, onCancelled);
+            }
+            else
+            {
+                onDone();
+            }
 
             while (!cancelled && !done)
             {
@@ -359,7 +372,14 @@ namespace GamenChangerCore
             };
 
             // キャンセルアニメーション開始
-            parentHandler.OnCancelAnimationRequired(this, initalPos, onDone);
+            if (parentHandler != null)
+            {
+                parentHandler.OnFlickCancelAnimationRequired(this, initalPos, onDone);
+            }
+            else
+            {
+                onDone();
+            }
 
             while (!done)
             {
@@ -458,36 +478,34 @@ namespace GamenChangerCore
             // 上位のハンドラがあればそれに対してタッチ反応があったことを通知する
             if (parentHandler != null)
             {
-                parentHandler.Touch(this);
+                parentHandler.TouchOnFlickableCornerDetected(this);
             }
 
             // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
             // TODO: GetComponentsInChildren系を消したいところ。
             foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
             {
-                containedUIComponent.Touch();
+                containedUIComponent.CornerTouchDetected();
             }
         }
 
         // willDisappearを自身のコンテンツに出し、willAppearを関連する方向のコンテンツに出す
-        private void NotifyAppearance(Vector2 delta)
+        private void NotifyAppearance(FlickDirection flickedDir)
         {
             // 上位のハンドラがあればそれに対して消える予定を通知する
             if (parentHandler != null)
             {
-                parentHandler.WillDisappear(this);
+                parentHandler.FlickableCornerWillDisappear(this);
             }
 
             // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
             foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
             {
-                containedUIComponent.WillDisappear();
+                containedUIComponent.CornerWillDisappear();
             }
 
-            var actualMoveDir = DetectFlickingDirection(delta);
-
             // これから表示される要素のcontentsにwillAppearを伝える
-            switch (actualMoveDir)
+            switch (flickedDir)
             {
                 case FlickDirection.RIGHT:
                     WillAppear(CornerFromLeft); break;
@@ -514,7 +532,7 @@ namespace GamenChangerCore
                 // 下流にハンドラがいれば送り出す
                 foreach (var containedUIComponent in corner.GetComponentsInChildren<ICornerContent>())
                 {
-                    containedUIComponent.WillAppear();
+                    containedUIComponent.CornerWillAppear();
                 }
             }
         }
@@ -524,7 +542,64 @@ namespace GamenChangerCore
         {
             if (parentHandler != null)
             {
-                parentHandler.WillAppear(this);
+                parentHandler.FlickableCornerWillAppear(this);
+            }
+        }
+
+        // キャンセル関連を流すFlickWillCancel, 
+        private void NotifyCancelling(FlickDirection flickedDir)
+        {
+            // 上位のハンドラがあればそれに対して消える予定を通知する
+            if (parentHandler != null)
+            {
+                parentHandler.FlickableCornerWillBack(this);
+            }
+
+            // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
+            foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
+            {
+                containedUIComponent.CornerWillBack();
+            }
+
+            // これから表示される要素のcontentsにwillCancelを伝える
+            switch (flickedDir)
+            {
+                case FlickDirection.RIGHT:
+                    WillCancel(CornerFromLeft); break;
+                case FlickDirection.LEFT:
+                    WillCancel(CornerFromRight); break;
+                case FlickDirection.UP:
+                    WillCancel(CornerFromBottom); break;
+                case FlickDirection.DOWN:
+                    WillCancel(CornerFromTop); break;
+            }
+        }
+
+        // willCancelを上下のコンテンツに送り出す
+        private void WillCancel(Corner corner)
+        {
+            if (corner != null)
+            {
+                // 上流がある型であれば送り出す
+                if (corner is FlickableCorner)
+                {
+                    ((FlickableCorner)corner).SendWillCancel();
+                }
+
+                // 下流にハンドラがいれば送り出す
+                foreach (var containedUIComponent in corner.GetComponentsInChildren<ICornerContent>())
+                {
+                    containedUIComponent.CornerWillCancel();
+                }
+            }
+        }
+
+        // 上流へとWillCancelを送り出す
+        private void SendWillCancel()
+        {
+            if (parentHandler != null)
+            {
+                parentHandler.FlickableCornerWillCancel(this);
             }
         }
 
@@ -534,14 +609,14 @@ namespace GamenChangerCore
             // 上位のハンドラがあればそれに対して消える予定のキャンセルを通知する
             if (parentHandler != null)
             {
-                parentHandler.DisppearCancelled(this);
+                parentHandler.FlickableCornerDisppearCancelled(this);
             }
 
             // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
             // TODO: GetComponentsInChildren<ICornerContent> あとでなんとかしよう。重そう。
             foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
             {
-                containedUIComponent.DisppearCancelled();
+                containedUIComponent.CornerDisppearCancelled();
             }
 
             // 関連コンテンツが存在すれば引っ張られているはずなのでappearCancelを伝える
@@ -564,7 +639,7 @@ namespace GamenChangerCore
                 // 下流に出現キャンセルを送り出す
                 foreach (var containedUIComponent in corner.GetComponentsInChildren<ICornerContent>())
                 {
-                    containedUIComponent.AppearCancelled();
+                    containedUIComponent.CornerAppearCancelled();
                 }
             }
         }
@@ -574,7 +649,7 @@ namespace GamenChangerCore
         {
             if (parentHandler != null)
             {
-                parentHandler.AppearCancelled(this);
+                parentHandler.FlickableCornerAppearCancelled(this);
             }
         }
 
@@ -584,13 +659,13 @@ namespace GamenChangerCore
             // 上位のハンドラがあればそれに対して消えたことを通知する
             if (parentHandler != null)
             {
-                parentHandler.DidDisappear(this);
+                parentHandler.FlickableCornerDidDisappear(this);
             }
 
             // 自身の持っているcontentsに対応のものがあればdisappearを伝える
             foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
             {
-                containedUIComponent.DidDisappear();
+                containedUIComponent.CornerDidDisappear();
             }
 
             // 関連コンテンツがあればappearを伝える
@@ -623,7 +698,7 @@ namespace GamenChangerCore
                 // 下流に出現完了を送り出す
                 foreach (var containedUIComponent in corner.GetComponentsInChildren<ICornerContent>())
                 {
-                    containedUIComponent.DidAppear();
+                    containedUIComponent.CornerDidAppear();
                 }
             }
         }
@@ -633,7 +708,7 @@ namespace GamenChangerCore
         {
             if (parentHandler != null)
             {
-                parentHandler.DidAppear(this);
+                parentHandler.FlickableCornerDidAppear(this);
             }
         }
 
@@ -946,7 +1021,7 @@ namespace GamenChangerCore
             }
         }
 
-        // 左、左、と上、下、どちらか一方のみがある時は制限された向きにのみmoveする。
+        // 左、右、と上、下、どちらか一方のみがある時は制限された向きにのみmoveする。
         private void ApplyPositionLimitByDirection()
         {
             switch (flickDir)
@@ -1015,13 +1090,13 @@ namespace GamenChangerCore
                 // 上流があればdisappear度合いを伝える
                 if (parentHandler != null)
                 {
-                    parentHandler.DisppearProgress(this, disappearProgress);
+                    parentHandler.FlickableCornerDisppearProgress(this, disappearProgress);
                 }
 
                 // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
                 foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
                 {
-                    containedUIComponent.DisppearProgress(disappearProgress);
+                    containedUIComponent.CornerDisppearProgress(disappearProgress);
                 }
 
                 // これから表示される要素のcontentsにappearProgressを伝える
@@ -1047,13 +1122,13 @@ namespace GamenChangerCore
                 // 上流があればdisappear度合いを伝える
                 if (parentHandler != null)
                 {
-                    parentHandler.DisppearProgress(this, disappearProgress);
+                    parentHandler.FlickableCornerDisppearProgress(this, disappearProgress);
                 }
 
                 // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
                 foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
                 {
-                    containedUIComponent.DisppearProgress(disappearProgress);
+                    containedUIComponent.CornerDisppearProgress(disappearProgress);
                 }
 
                 // これから表示される要素のcontentsにappearProgressを伝える
@@ -1081,7 +1156,7 @@ namespace GamenChangerCore
                 // 下流に進捗を伝える
                 foreach (var containedUIComponent in corner.GetComponentsInChildren<ICornerContent>())
                 {
-                    containedUIComponent.AppearProgress(progress);
+                    containedUIComponent.CornerAppearProgress(progress);
                 }
             }
         }
@@ -1091,7 +1166,7 @@ namespace GamenChangerCore
         {
             if (parentHandler != null)
             {
-                parentHandler.AppearProgress(this, progress);
+                parentHandler.FlickableCornerAppearProgress(this, progress);
             }
         }
 
@@ -1215,25 +1290,27 @@ namespace GamenChangerCore
         }
 
         // fromからtoへとつながる経路探索を行う
-        public static (bool isFound, GamenDriver driver) TryFindingAutoFlickRoute(FlickableCorner from, FlickableCorner to)
+        public static bool TryFindingAutoFlickRoute(FlickableCorner from, FlickableCorner to, out GamenDriver driver)
         {
+            driver = null;
+
             if (from == null)
             {
-                return (false, null);
+                return false;
             }
             if (to == null)
             {
-                return (false, null);
+                return false;
             }
 
             // 接続されていれば、経路が見つかってステップが返せるはず。
             if (IsConnected(from, to, out var direction, out var steps))
             {
-                var driver = new GamenDriver(steps);
-                return (true, driver);
+                driver = new GamenDriver(steps);
+                return true;
             }
 
-            return (false, null);
+            return false;
         }
 
         // FlickableCorner同士の上下左右の接続を見て、接続があればtrueを返す。
