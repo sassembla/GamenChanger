@@ -78,9 +78,11 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         };
     }
 
+
     public void OnDragApproachAnimationRequired(int index, GameObject go, Vector2 approachTargetPosition, Action onDone, Action onCancelled)
     {
         var rectTrans = go.GetComponent<RectTransform>();
+        animating = true;
         var waitGroup = new WaitGroup(
             () => animating = false
         );
@@ -104,9 +106,10 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         StartCoroutine(approach());
     }
 
-    public void OnDragCancelAnimationRequired(GameObject go, Vector2 initialPosition, Action onDone)
+    public void OnDragBackAnimationRequired(GameObject go, Vector2 initialPosition, Action onDone)
     {
         var rectTrans = go.GetComponent<RectTransform>();
+        animating = true;
         var waitGroup = new WaitGroup(
             () => animating = false
         );
@@ -130,7 +133,7 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         StartCoroutine(cancel());
     }
 
-    public void OnDragCancelled(int index, GameObject go)
+    public void OnDragBacked(int index, GameObject go)
     {
         // 何もしない
     }
@@ -145,7 +148,7 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         }
     }
 
-    public void OnDragDoneOnGrid(int index, GameObject go)
+    public void OnDragReachedOnGrid(int index, GameObject go)
     {
         // 表示を更新する
         OnDragApproachingToGrid(index, go);
@@ -196,7 +199,7 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
     }
 
 
-
+    // oneOfNシリーズ
 
     public void OnOneOfNCornerReloaded(GameObject one, GameObject[] all, Action<GameObject> setOneOfNAct)
     {
@@ -204,6 +207,11 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         this.set2Of4Act = () => setOneOfNAct(all[1]);
         this.set3Of4Act = () => setOneOfNAct(all[2]);
         this.set4Of4Act = () => setOneOfNAct(all[3]);
+    }
+    public bool OneOfNCornerShouldAcceptInput()
+    {
+        // アニメーション中でなければイベントを継続する
+        return !animating;
     }
 
     public void OnOneOfNChangedToOneByHandler(GameObject one, GameObject before, GameObject[] all)
@@ -213,6 +221,8 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
 
     public void OnOneOfNChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all)
     {
+        // Debug.Log("OnOneOfNChangedToOneByPlayer animating:" + animating + " frame:" + Time.frameCount);
+
         // プレイヤーがUI上のButton1~4のどれかを押したので、flickViewとfloatButtonを移動させる。
         if (FlickableCornersCorner.TryExposureCorners<FlickableCorner>(out var flickableCorners))
         {
@@ -305,14 +315,9 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
 
     // flicableCorner関連
 
-    public void OnFlickRequestFromFlickableCorner(FlickableCorner flickableCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir)
+    public bool OnFlickRequestFromFlickableCorner(FlickableCorner flickableCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir)
     {
-        // 何もしない
-    }
-
-    public void TouchOnFlickableCornerDetected(FlickableCorner flickableCorner)
-    {
-        // 何もしない
+        return true;
     }
 
     public void FlickableCornerWillBack(FlickableCorner flickableCorner)
@@ -327,7 +332,7 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
 
     public void FlickableCornerWillAppear(FlickableCorner flickableCorner)
     {
-        // Debug.Log("FlickableCornerWillAppear:" + flickableCorner);
+        // Debug.Log("FlickableCornerWillAppear animating:" + animating);
         var targetIndex = -1;
         switch (flickableCorner.name)
         {
@@ -361,8 +366,6 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         {
             return;
         }
-
-        Debug.Log("targetIndex:" + targetIndex + " currentIndexOfSegue:" + currentIndexOfSegue);
 
         // floatButtonを移動させる
         {
@@ -431,6 +434,7 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
     public void OnFlickProcessAnimationRequired(FlickableCorner flickableCorner, Vector2 targetPosition, Action onDone, Action onCancelled)
     {
         var rectTrans = flickableCorner.GetComponent<RectTransform>();
+        animating = true;
         var waitGroup = new WaitGroup(
             () => animating = false
         );
@@ -459,6 +463,7 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
     public void OnFlickCancelAnimationRequired(FlickableCorner flickableCorner, Vector2 initialPosition, Action onDone)
     {
         var rectTrans = flickableCorner.GetComponent<RectTransform>();
+        animating = true;
         var waitGroup = new WaitGroup(
            () => animating = false
        );
@@ -530,6 +535,7 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
     private bool animating;
     public bool IsRaycastLocationValid(Vector2 sp, Camera eventCamera)
     {
+        // Debug.Log("animating:" + animating + " frame:" + Time.frameCount);// TODO: あー同じ条件でdragも無効化すればいいのか。
         return !animating;
     }
 }

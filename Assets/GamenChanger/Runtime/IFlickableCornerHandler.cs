@@ -5,10 +5,7 @@ namespace GamenChangerCore
 {
     public interface IFlickableCornerHandler
     {
-        // handlers
-        void OnFlickRequestFromFlickableCorner(FlickableCorner flickableCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir);
-
-        void TouchOnFlickableCornerDetected(FlickableCorner flickableCorner);
+        bool OnFlickRequestFromFlickableCorner(FlickableCorner flickableCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir);
 
         void FlickableCornerWillAppear(FlickableCorner flickableCorner);
         void FlickableCornerAppearProgress(FlickableCorner flickableCorner, float progress);

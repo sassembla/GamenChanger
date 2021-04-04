@@ -8,25 +8,100 @@ namespace GamenChangerCore
 {
     /*
         フリック可能なCorner
-        // TODO: 対象となるhandlerやcornerを見つけてinspectorに表示不可だがクリックすると光るボタンとして表示したい感じある。
+        // TODO: Editor上で、対象となるhandlerやcornerを見つけてinspectorに表示不可だがクリックすると光るボタンとして表示したい感じある。
+        // TODO: フリック操作の結果表示されてきた別のビューにタッチしたら反応、というのをやりたい。っていうかどうするといいんだろう。一番楽なのはひとまとめに扱うことなんだけど、、
+        // TODO: flick不可能な方向へのフリックの結果発生する、遷移できないドラッグへとバネを実装したい。まあどうやんのっていう話ではあるが
+        // TODO: タッチ入力による加速度のバーチャライズをしたい。加速によってフリックを達成させるという感じ。手始めにデルタの加速度を計測してみるか。
     */
-    public class FlickableCorner : Corner, IDragHandler, IEndDragHandler, IInitializePotentialDragHandler, IBeginDragHandler, IPointerEnterHandler
+    public class FlickableCorner : Corner, IDragHandler, IEndDragHandler, IPointerEnterHandler
     {
-        private enum FlickState
+        private enum FlickAnimationState
         {
             NONE,
-            INIT,
-            BEGIN,
-            FLICKING,
             PROCESSING,
             CANCELLING,
         }
+        private FlickAnimationState animationState = FlickAnimationState.NONE;
 
-        private FlickState state = FlickState.NONE;
-        private FlickDirection flickDir;
+        // このCornerのデフォルト位置
         private Vector2 initalPos;
 
-        private IFlickableCornerHandler parentHandler;
+        // このFlickableCornerと、さらに同一レイヤーに存在する全てのFlickableCornerのイベントを受け取るハンドラ。
+        // 別に単に切り替わる画面が欲しい場合もあるため、参照が存在しない場合も許容する。
+        private IFlickableCornerHandler handler;
+
+        // このアプリケーション上に存在する全てのFlickableCornerが所属するネットワーク、、とか、そういうの、、いやーーうーんん、、
+        // 単になんかタッチが跨いでも問題なければいいだけなんだよな、、それって簡単に解決できないかな、、フォーカスの概念があればいけるか？
+        // private static Dictionary<int, FlickableCornerNetwork> network = new Dictionary<int, FlickableCornerNetwork>();
+        // private static List<> なんかsharedなタッチの情報をここに乗っけておいて、探索して他にもいれば、とかができる気はするが、
+        // そもそも付け焼き刃でやらない方がいい気はしている。あとでやろう。
+
+        // このFlickableCornerに対して発生しているflickの一意なインスタンスが持つ要素。
+        // 複数のタッチが継続的に動作するのを、一つのflick操作として認識するために生成される。
+        private class FlickIdentity
+        {
+            private int currentTouchId = -2;
+            public readonly FlickDirection interactableDir;
+            public readonly FlickDirection flickableDir;
+
+            public FlickIdentity(int initialTouchId, FlickDirection interactableFlickDir, FlickDirection flickableDir)
+            {
+                this.currentTouchId = initialTouchId;
+                this.interactableDir = interactableFlickDir;
+                this.flickableDir = flickableDir;
+            }
+
+            public void UpdateTouchId(int newTouchId)
+            {
+                this.currentTouchId = newTouchId;
+
+                // 以前のtouchIdで稼いでいた距離の委譲を行う
+                this.additionalDiff += this.diffOfCurrentTouchId;
+
+                // リセットを行う
+                this.diffOfCurrentTouchId = Vector2.zero;
+            }
+            public int TouchId => currentTouchId;
+
+            private Vector2 additionalDiff = Vector2.zero;
+
+            private Vector2 diffOfCurrentTouchId = Vector2.zero;
+
+            public void UpdateDiff(Vector2 diffOfCurrentTouchId)
+            {
+                this.diffOfCurrentTouchId = diffOfCurrentTouchId;
+            }
+
+            public Vector2 InheritedDiff => additionalDiff;
+
+            // デバッグ用
+            public override string ToString()
+            {
+                return "currentTouchId:" + currentTouchId + " availableDir:" + interactableDir;
+            }
+        }
+
+        private FlickIdentity identity;
+
+        // この画面でdrag操作として認められ、まだendしていないタッチのidを収集してあるもの。
+        private List<int> currentTouchIds = new List<int>();
+
+        // dragで個々のタッチから更新され、updateで判定されるdelta値。
+        private struct DeltaMovement
+        {
+            public readonly int index;
+            public readonly float value;
+            public readonly Vector2 initialPos;
+            public readonly Vector2 currentPos;
+            public DeltaMovement(int index, float value, Vector2 initialPos, Vector2 currentPos)
+            {
+                this.index = index;
+                this.value = value;
+                this.initialPos = initialPos;
+                this.currentPos = currentPos;
+            }
+        }
+        private DeltaMovement currentFrameMaxDeltaMovement = new DeltaMovement(-2, 0f, Vector2.zero, Vector2.zero);
 
         public new void Awake()
         {
@@ -36,8 +111,7 @@ namespace GamenChangerCore
                     // 親を探して、IFlickableCornerFocusHandlerを持っているオブジェクトがあったら、変更があるたびに上流に通知を流す。
                     if (transform.parent != null)
                     {
-                        Debug.Log("parentHandler:" + transform.parent);
-                        parentHandler = transform.parent.GetComponent<IFlickableCornerHandler>();
+                        handler = transform.parent.GetComponent<IFlickableCornerHandler>();
                     }
                 },
                 excludedGameObject =>
@@ -49,212 +123,220 @@ namespace GamenChangerCore
             base.Awake();
         }
 
-        // 開始条件を判定するイベント
+
+        // uGUI drag handlers
+
+        // TODO: 同一flickable上のdragに対してidをつけて、それごとに現在触っているFlickableCornerに接続しているflickablesが存在する感じになりそう。networkを登録する感じにするか。
+        /*
+            どこかのflickableがタッチを拾う -> ネットワーク内に他のタッチがなければ新規登録
+            どこかのflickableがタッチを拾う -> ネットワーク内に他のタッチがあるので、無視。
+            どこかのflickableがdragを拾う -> latest更新 + diffによるビューの移動(このへんが実際どうなってるかわからんのよな、やってみよ)
+
+            エディタの場合はタッチIDが-1固定になっている。まあはい。値として気をつけよう。
+            ・画面外から直にオブジェクトへのタッチを計測したい
+            ・画面外から別のオブジェクトを経たタッチは計測したくない
+        */
+
         public void OnPointerEnter(PointerEventData eventData)
         {
-            switch (state)
+            // アニメーション中なら入力を受け付けない
+            if (animationState != FlickAnimationState.NONE)
             {
-                case FlickState.NONE:
-                    break;
-                default:
-                    return;
+                return;
             }
 
-            if (eventData.eligibleForClick && eventData.pointerEnter == this.gameObject && !touchInScreen)
+            // エディタでのみ、画面外からオブジェクトへのタッチインをサポートする。
             {
-                // 実機でも動作する、このオブジェクトをdrag中にできる方法。
-                eventData.pointerDrag = this.gameObject;
-                OnInitializePotentialDrag(eventData);
-                return;
+#if UNITY_EDITOR
+                if (eventData.eligibleForClick && eventData.pointerEnter == this.gameObject && !touchInScreenForEditor)
+                {
+                    // このオブジェクトを強制的にdrag中にする。
+                    // 弊害としてエディタで画面外からドラッグし画面内で離した場合、本来動かない側にキャンセルモーションが発生することがある。
+                    eventData.pointerDrag = this.gameObject;
+                    return;
+                }
+#endif
             }
         }
 
-        public void OnInitializePotentialDrag(PointerEventData eventData)
-        {
-            switch (state)
-            {
-                case FlickState.NONE:
-                    // pass.
-                    break;
-                // 最終アニメーション動作中なので入力を無視する
-                case FlickState.PROCESSING:
-                case FlickState.CANCELLING:
-                    return;
-                case FlickState.INIT:
-                    // 含まれるボタンを押したりすると発生する。無視していいやつ。
-                    break;
-                default:
-                    Debug.LogError("OnInitializePotentialDrag unhandled state:" + state);
-                    state = FlickState.NONE;
-                    return;
-            }
-
-            if (eventData.pointerDrag != this.gameObject)
-            {
-                // このオブジェクトではないものの上で発生したので、無効にする。
-                state = FlickState.NONE;
-                return;
-            }
-
-            // 開始
-            state = FlickState.INIT;
-            NotifyTouch();
-        }
-
-        public void OnBeginDrag(PointerEventData eventData)
-        {
-            if (eventData.pointerDrag != this.gameObject)
-            {
-                // このオブジェクトではないものの上に到達したので、ドラッグの解除を行う
-                state = FlickState.NONE;
-                return;
-            }
-
-            switch (state)
-            {
-                case FlickState.INIT:
-                    // pass.
-                    break;
-                case FlickState.PROCESSING:
-                case FlickState.CANCELLING:
-                    // すでにend中なので無視する
-                    return;
-                default:
-                    // イレギュラーなので解除
-                    state = FlickState.NONE;
-                    return;
-            }
-
-            // 最初のframeのflick操作を行う
-
-            var delta = eventData.delta;
-
-            // フリック方向を確定させる(左右 or 上下)
-            var availableFlickDir = GetAvailableDirection(delta);
-
-            // 利用できる方向がない場合、無効化する。
-            if (availableFlickDir == FlickDirection.NONE)
-            {
-                state = FlickState.NONE;
-                return;
-            }
-
-            flickDir = availableFlickDir;
-
-            // from系の初期位置を保持
-            UpdateInitialPos();
-
-            // eventDataのパラメータを上書きし、指定のオブジェクトをドラッグしている状態に拘束する
-            var moveDiff = ApplyConstraintToDir(flickDir, eventData);
-
-            // 動かす
-            Move(moveDiff);
-
-            // TODO: この時に向かった方向とは逆の方向にdragし、なおかつ初期値を超えたタイミングで、キャンセルを流してなおかつ反対側にあるコンテンツがあればwillAppearを呼び出したい。
-
-            state = FlickState.BEGIN;
-        }
-
-        // 継続条件チェックを行うイベント
         public void OnDrag(PointerEventData eventData)
         {
-            // 特定状態以外無視する
-            switch (state)
+            // アニメーション中なら入力を受け付けない
+            if (animationState != FlickAnimationState.NONE)
             {
-                case FlickState.BEGIN:
-                    state = FlickState.FLICKING;
-                    // pass.
-                    break;
-                case FlickState.FLICKING:
-                    // pass.
-                    break;
-                case FlickState.NONE:
-                    // 無視する
-                    return;
-                case FlickState.PROCESSING:
-                case FlickState.CANCELLING:
-                    // すでにend中なので無視する
-                    return;
-                default:
-                    // Debug.LogError("unhandled state:" + state);
-                    state = FlickState.NONE;
-                    return;
+                return;
             }
 
-            // drag対象がついて行ってない状態なので、終了させるという条件が必要になる。
-            // 画面外にdragしたら終了
-            if (0 < eventData.position.x && eventData.position.x < Screen.width && 0 < eventData.position.y && eventData.position.y < Screen.height)
+            // まだflick生成 = flick開始前であれば、判定を行う。
+            if (identity == null)
+            {
+                var delta = eventData.delta;
+
+                // 上位のハンドラがあれば、そもそもflickするか、これからflickしそうな方向へとCornerを追加するか、リクエストを送る
+                if (handler != null)
+                {
+                    // 値から該当しそうなフリック方向を推定する
+                    var estimatedFlickDir = EstimateFlickDir(delta);
+
+                    var isAccepted = handler.OnFlickRequestFromFlickableCorner(this, ref CornerFromLeft, ref CornerFromRight, ref CornerFromTop, ref CornerFromBottom, estimatedFlickDir);
+
+                    // ハンドラが受け付けなければ動かない
+                    if (!isAccepted)
+                    {
+                        return;
+                    }
+                }
+
+                // 利用可能なフリック方向を確定させる(左右 or 上下 or NONE)
+                var interactableFlickDir = GetInteractableDirection(delta);
+
+                // 利用可能なflickDirを見出せなかったので終了
+                if (interactableFlickDir == FlickDirection.NONE)
+                {
+                    return;
+                }
+
+                FrameLog("this:" + this.gameObject.name + " がdragを受け取った");
+                var flickableDir = GetFlickableDirection(interactableFlickDir);
+
+                // flickを初期化する。
+                identity = new FlickIdentity(eventData.pointerId, interactableFlickDir, flickableDir);
+
+                // 初期位置を規定して差分で移動させる準備をする。
+                UpdateInitialPos();
+            }
+
+            // エディタの場合のみ、画面外へのフリックが継続的に生きる。
+            // そのため、強制的に終了させてデバッグ効率を上げる。
+            {
+#if UNITY_EDITOR
+                if (0 <= currentFrameMaxDeltaMovement.currentPos.x &&
+                    currentFrameMaxDeltaMovement.currentPos.x < Screen.width &&
+                    0 <= currentFrameMaxDeltaMovement.currentPos.y &&
+                    currentFrameMaxDeltaMovement.currentPos.y < Screen.height
+                )
+                {
+                    // 画面内なのでこのタッチは継続している
+                }
+                else
+                {
+                    // 画面外に出たので終了させる
+                    // TODO: どうやるといいんだろう、、
+                }
+#endif
+            }
+
+            // このフレームで動いたすべてのdragの差分の中で、最大のものを収集する。
+            // deltaの比較を行う。
+            var deltaOfThisPointerDrag = eventData.delta;
+            var dirConstrainedDeltaMovementOfThisPointerDrag = GetConstraintedDeltaMovement(identity.interactableDir, deltaOfThisPointerDrag);
+
+            // deltaの値が大きい場合、採用する。
+            // TODO: ここに一定以上のサイズだったら〜とかを足すと良さそう。微動を拾わないで済む。
+            var absDelta = Mathf.Abs(dirConstrainedDeltaMovementOfThisPointerDrag);
+            if (0 < absDelta)
             {
                 // pass.
             }
             else
             {
-                // 画面外にタッチが飛び出したので、drag終了する。
-                OnEndDrag(eventData);
                 return;
             }
 
-            // このオブジェクトではないものの上に到達したので、ドラッグの解除を行う
-            if (eventData.pointerDrag != this.gameObject)
+            // 同一フレームで事前に行われた計算のサイズよりdeltaが小さい場合、無視する。
+            if (absDelta < Mathf.Abs(currentFrameMaxDeltaMovement.value))
             {
-                // TODO: これって発生するのかな、、
-                Debug.Log("drag ハズレ3");
+                return;
             }
 
-            // eventDataのパラメータを上書きし、指定のオブジェクトをドラッグしている状態に拘束する
-            var moveDiff = ApplyConstraintToDir(flickDir, eventData);
+            /* 
+                ここでこのtouchがcertificateされた。
 
-            // ドラッグ継続
-            Move(moveDiff);
+                この時点で、
+                「もともとあるやつがそのまま動いた」
+                「もともとあるやつが現在のやつよりも動いた」
+                「新規に足された」
+                の3択になる。
 
-            var actualMoveDir = DetectFlickingDirection(eventData.delta);
+                これを分析する。
+            */
+            var continuedOrAwakeOrNewTouchId = eventData.pointerId;
 
-            //progressの更新を行う
-            UpdateProgress(actualMoveDir);
+            if (currentTouchIds.Contains(continuedOrAwakeOrNewTouchId))
+            {
+                // 旧知のタッチの中で、今までidentityが保持していたタッチが継続して動作した
+                if (identity.TouchId == continuedOrAwakeOrNewTouchId)
+                {
+                    // 何もしない
+                }
+                else // 旧知のタッチの中で、休眠していたタッチが復帰して動作した
+                {
+                    // 休眠から復帰したタッチの動きを扱う。
+                    // 休眠していたタッチを再度動かすと、その初期位置は最初にそのタッチを開始した場所そのままになるため、そのままdiffを計算すると動作差分が一気に増えてしまってdragを継続するときに都合が悪い。
+                    // そのため、新たに発生したタッチと動作が同じになるように、このイベントのpressPositionを[1フレーム前の値]に上書きする。
+                    // 1フレーム前の値は、現在のpositionからdeltaを引いた位置になる。
+                    // こうすることで、updateで実行されるUpdateFlickableViewMovement関数に対して改変したpressPositionが使われるようになり、滑らかに動くように
+                    eventData.pressPosition = eventData.position - eventData.delta;
+                }
+            }
+            else
+            {
+                // 新規に発生したタッチが動作したので、記録する。
+                currentTouchIds.Add(continuedOrAwakeOrNewTouchId);
+            }
+
+            // 判定値を更新する。
+            // updateで最終的な判定値の処理を行い、そのフレームでのdrag処理の実行を行う。
+            currentFrameMaxDeltaMovement = new DeltaMovement(continuedOrAwakeOrNewTouchId, dirConstrainedDeltaMovementOfThisPointerDrag, eventData.pressPosition, eventData.position);
         }
 
-        // 終了時イベント
         public void OnEndDrag(PointerEventData eventData)
         {
-            // 特定状態以外無視する
-            switch (state)
+            // タッチが離れたら入力中記録から消す。
+            var endedTouchId = eventData.pointerId;
+            if (currentTouchIds.Contains(endedTouchId))
             {
-                case FlickState.FLICKING:
-                    // pass.
-                    break;
-                case FlickState.NONE:
-                    // 無視する
-                    return;
-                case FlickState.PROCESSING:
-                case FlickState.CANCELLING:
-                    // すでにend中なので無視する
-                    return;
-                default:
-                    Debug.LogError("unhandled state:" + state);
-                    state = FlickState.NONE;
-                    return;
+                currentTouchIds.Remove(endedTouchId);
             }
 
-            // 正常にflickの終了に到達したので、flick発生かどうかを判定する。
+            // identityがない状態でのendは無視する
+            if (identity == null)
+            {
+                return;
+            }
 
-            // flickが発生したかどうかチェックし、発生していれば移動を完了させる処理モードに入る。
-            // そうでなければ下の位置に戻すキャンセルモードに入る。
-            var flickedDir = DetermineFlickResult();
+            // 現在主として扱っているtouchId以外のendは無視する
+            if (identity.TouchId != eventData.pointerId)
+            {
+                return;
+            }
+
+            // identityに登録されているtouchIdのポインターがendDragした場合、flickを終了する。
+
+            // 実際にフリック可能な方向からフリック結果を取得する。
+            var flickedDir = DetermineFlickResult(identity.flickableDir);
 
             // progressの更新を行う
             UpdateProgress(flickedDir);
 
+
+            // flick成功か失敗かの判定を行う
             var isFlicked = flickedDir != FlickDirection.NONE;
+
             if (isFlicked)
             {
-                state = FlickState.PROCESSING;
+                // フリックが成立したのでアニメーションを開始する
+                animationState = FlickAnimationState.PROCESSING;
 
                 // ここでWillAppear/WillDisappearを流す
                 NotifyAppearance(flickedDir);
             }
             else
             {
-                state = FlickState.CANCELLING;
+                // フリックが成立しなかったのでキャンセルアニメーションを開始する
+                animationState = FlickAnimationState.CANCELLING;
+
+                // TODO: 必要であればflickがキャンセルされたことを流す
             }
 
             // enumeratorを回してアニメーション中状態を処理する
@@ -262,10 +344,10 @@ namespace GamenChangerCore
             {
                 while (true)
                 {
-                    switch (state)
+                    switch (animationState)
                     {
                         // flick不成立でのキャンセル中状態。
-                        case FlickState.CANCELLING:
+                        case FlickAnimationState.CANCELLING:
                             var cancellingCor = CancellingCor();
 
                             while (cancellingCor.MoveNext())
@@ -273,11 +355,11 @@ namespace GamenChangerCore
                                 yield return null;
                             }
 
-                            state = FlickState.NONE;
+                            animationState = FlickAnimationState.NONE;
                             yield break;
 
                         // flick成立、目的位置への移動処理を行っている状態。
-                        case FlickState.PROCESSING:
+                        case FlickAnimationState.PROCESSING:
                             var processingCor = ProcessingCor(flickedDir);
 
                             while (processingCor.MoveNext())
@@ -285,7 +367,7 @@ namespace GamenChangerCore
                                 yield return null;
                             }
 
-                            state = FlickState.NONE;
+                            animationState = FlickAnimationState.NONE;
                             yield break;
 
                         default:
@@ -299,7 +381,11 @@ namespace GamenChangerCore
 
             // animation用のCoroutineを作ってUpdateで回す。
             // こうすることで、不意に画面遷移が発生してもこのGOがなければ事故が発生しないようにする。
+            // 画面遷移から戻ってくるときには初期化して欲しい気持ちがある。
             this.animationCor = animationCor();
+
+            // TODO: identityの初期化をやっていいのかどうかがわからない。hiddenな上位でやらせた方がいい気はする。さて、それってどうしようか。
+            identity = null;
         }
 
         private IEnumerator ProcessingCor(FlickDirection flickedDir)
@@ -331,9 +417,9 @@ namespace GamenChangerCore
                     break;
             }
 
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.OnFlickProcessAnimationRequired(this, initalPos + moveByUnitSizeVec, onDone, onCancelled);
+                handler.OnFlickProcessAnimationRequired(this, initalPos + moveByUnitSizeVec, onDone, onCancelled);
             }
             else
             {
@@ -372,9 +458,9 @@ namespace GamenChangerCore
             };
 
             // キャンセルアニメーション開始
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.OnFlickCancelAnimationRequired(this, initalPos, onDone);
+                handler.OnFlickCancelAnimationRequired(this, initalPos, onDone);
             }
             else
             {
@@ -418,33 +504,27 @@ namespace GamenChangerCore
 
         private IEnumerator animationCor;
 
-        private bool touchInScreen = false;
+        private bool touchInScreenForEditor = false;
         private void Update()
         {
-            // タッチインがどこから行われたかを判定するために、フレームごとにタッチが画面内にあるかどうかを取得する。
+            // イベント処理の直後に呼び出されるUpdate
+
+            // エディタでのみ、タッチインがどこから行われたかを判定するために、フレームごとにタッチが画面内にあるかどうかを取得する。
+            {
 #if UNITY_EDITOR
-            var x = Input.mousePosition.x;
-            var y = Input.mousePosition.y;
-            if (0 <= x && x <= Screen.width && 0 <= y && y <= Screen.height)
-            {
-                // in screen.
-                touchInScreen = true;
-            }
-            else// マウスがスクリーン外な場合、このフレームでのマウス位置をフレーム外に持っていく。
-            {
-                touchInScreen = false;
-            }
-#else
-            // タッチがスクリーン内にない場合、このフレームでのタッチ可否をfalseにする。
-            if (Input.touchCount == 0)
-            {
-                touchInScreen = false;
-            }
-            else
-            {
-                touchInScreen = true;
-            }
+                var x = Input.mousePosition.x;
+                var y = Input.mousePosition.y;
+                if (0 <= x && x <= Screen.width && 0 <= y && y <= Screen.height)
+                {
+                    // in screen.
+                    touchInScreenForEditor = true;
+                }
+                else// マウスがスクリーン外な場合、このフレームでのマウス位置をフレーム外に持っていく。
+                {
+                    touchInScreenForEditor = false;
+                }
 #endif
+            }
 
             // アニメーション要素があれば動かす
             if (animationCor != null)
@@ -455,10 +535,80 @@ namespace GamenChangerCore
                     animationCor = null;
                 }
             }
+
+            // 最低一つのdragがこのビュー上にあったことを検知し、動かす。
+            // ここでこのビューが受け取る全てのマルチタッチのdragを収束させている。
+            // TODO: 必要があればさらに上位で収束させる。ありそうなんだよな〜〜、、 と思ったがそうでもないっぽい、移動をうまくやってるから入力時はこのビューが拾ってくれる。なるほど？ 
+            // いや単に全画面拾ってるっぽいが、、？ 
+            // -> 気のせいだった、ちゃんとタッチ判定ない。はい。なんかしないといけない。少なくともhiddenな中央集権は一個必要だなあ。
+            if (currentFrameMaxDeltaMovement.index != -2)
+            {
+                // アニメーション中ではない場合のみ、タッチ効果による移動を発生させる。
+                if (animationState == FlickAnimationState.NONE)
+                {
+                    UpdateFlickableViewMovement(currentFrameMaxDeltaMovement.index, currentFrameMaxDeltaMovement.initialPos, currentFrameMaxDeltaMovement.currentPos);
+
+                    // progressの更新を行う
+                    var actualMoveDir = DetectFlickingDirection(currentFrameMaxDeltaMovement.currentPos - currentFrameMaxDeltaMovement.initialPos);
+                    UpdateProgress(actualMoveDir);
+                }
+
+                // 次フレームのためにdeltaを初期化する
+                currentFrameMaxDeltaMovement = new DeltaMovement(-2, 0f, Vector2.zero, Vector2.zero);
+            }
+        }
+
+        // ビューのmoveを行う。
+        private void UpdateFlickableViewMovement(int index, Vector2 initialPos, Vector2 currentPos)
+        {
+            // 従来のtouchのdragを検出した。
+            if (identity.TouchId == index)
+            {
+                // 初期点からdir方向にdragした距離を計測する。
+                var continuousDragDiffFromInitialOfThisDrag = GetConstraintedDiffMovement(identity.interactableDir, identity.flickableDir, initialPos, currentPos);
+
+                // inherited + 特定の方向へと移動させたことにする。
+                // 実際にflickできる方向を加味した移動サイズを出す。
+                var continuousMoveSize = LimitMoveSizeByFlickableDir(identity.flickableDir, continuousDragDiffFromInitialOfThisDrag + identity.InheritedDiff);
+
+                Move(continuousMoveSize, identity.interactableDir);
+
+                // identityが持っているdiffの情報をアップデートする。
+                identity.UpdateDiff(continuousDragDiffFromInitialOfThisDrag);
+                return;
+            }
+
+            // 初期 or 追加されたtouchに加えて、新しいtouchによってdragが実行された。
+            // 処理的には似通っているが、綺麗にするとめちゃくちゃ認識するのが難しくなるため、分けて書く。
+
+            // touchIdが更新されることによって、「ここまでに移動していた距離」に対して差分値が発生することになる。
+            // touchIdを変更することによってリレーが発生する。
+            /*
+                touch Aで動かす -> 初期位置からのdiffで位置計算をする
+                touch Bに変更 + 動かす -> Bの初期位置からのdiff + Aで動いていた距離で、、
+                のように、touchが足されるごとにdiffが+されていく。で、BのdiffはAを引いたものが適応される。
+            */
+            var newTouchId = index;
+
+            // 新しいtouchのdragによる値を算出し、これまでのtouchで保持していた値をinheritする。
+            identity.UpdateTouchId(newTouchId);
+
+            // 初期点からdir方向にdragした距離を計測する。
+            var newDragDiffFromInitialOfThisDrag = GetConstraintedDiffMovement(identity.interactableDir, identity.flickableDir, initialPos, currentPos);
+
+            // inherited + 特定の方向へと移動させたことにする。
+            // 実際にflickできる方向を加味した移動サイズを出す。
+            var newMoveSize = LimitMoveSizeByFlickableDir(identity.flickableDir, newDragDiffFromInitialOfThisDrag + identity.InheritedDiff);
+
+            Move(newMoveSize, identity.interactableDir);
+
+            // identityが持っているdiffの情報をアップデートする。
+            identity.UpdateDiff(newDragDiffFromInitialOfThisDrag);
         }
 
         public float ReactUnitSize;// 反応サイズ、これを超えたら要素をmoveUnitSizeまで移動させる。
         public float MoveUnitSize;// 反応後移動サイズ
+        public float EmptyCornerUnitSize;// 虚無に対して引っ張ることができるサイズ
 
 
         // ここに要素がセットしてあればその方向に動作する
@@ -473,29 +623,13 @@ namespace GamenChangerCore
         private Vector2 cornerFromBottomInitialPos;
 
 
-        private void NotifyTouch()
-        {
-            // 上位のハンドラがあればそれに対してタッチ反応があったことを通知する
-            if (parentHandler != null)
-            {
-                parentHandler.TouchOnFlickableCornerDetected(this);
-            }
-
-            // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
-            // TODO: GetComponentsInChildren系を消したいところ。
-            foreach (var containedUIComponent in this.GetComponentsInChildren<ICornerContent>())
-            {
-                containedUIComponent.CornerTouchDetected();
-            }
-        }
-
         // willDisappearを自身のコンテンツに出し、willAppearを関連する方向のコンテンツに出す
         private void NotifyAppearance(FlickDirection flickedDir)
         {
             // 上位のハンドラがあればそれに対して消える予定を通知する
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.FlickableCornerWillDisappear(this);
+                handler.FlickableCornerWillDisappear(this);
             }
 
             // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
@@ -540,19 +674,19 @@ namespace GamenChangerCore
         // 上流へとWillAppearを送り出す
         private void SendWillAppear()
         {
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.FlickableCornerWillAppear(this);
+                handler.FlickableCornerWillAppear(this);
             }
         }
 
-        // キャンセル関連を流すFlickWillCancel, 
+        // キャンセル関連を流すFlickWillBack/Cancel
         private void NotifyCancelling(FlickDirection flickedDir)
         {
             // 上位のハンドラがあればそれに対して消える予定を通知する
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.FlickableCornerWillBack(this);
+                handler.FlickableCornerWillBack(this);
             }
 
             // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
@@ -597,9 +731,9 @@ namespace GamenChangerCore
         // 上流へとWillCancelを送り出す
         private void SendWillCancel()
         {
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.FlickableCornerWillCancel(this);
+                handler.FlickableCornerWillCancel(this);
             }
         }
 
@@ -607,9 +741,9 @@ namespace GamenChangerCore
         private void NotifyCancelled()
         {
             // 上位のハンドラがあればそれに対して消える予定のキャンセルを通知する
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.FlickableCornerDisppearCancelled(this);
+                handler.FlickableCornerDisppearCancelled(this);
             }
 
             // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
@@ -647,9 +781,9 @@ namespace GamenChangerCore
         // 上流へと出現キャンセルを送り出す
         private void SendAppearCancelled()
         {
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.FlickableCornerAppearCancelled(this);
+                handler.FlickableCornerAppearCancelled(this);
             }
         }
 
@@ -657,9 +791,9 @@ namespace GamenChangerCore
         private void NotifyProcessed(FlickDirection resultDir)
         {
             // 上位のハンドラがあればそれに対して消えたことを通知する
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.FlickableCornerDidDisappear(this);
+                handler.FlickableCornerDidDisappear(this);
             }
 
             // 自身の持っているcontentsに対応のものがあればdisappearを伝える
@@ -706,9 +840,9 @@ namespace GamenChangerCore
         // 上流へと出現完了を送り出す
         private void SendDidAppear()
         {
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.FlickableCornerDidAppear(this);
+                handler.FlickableCornerDidAppear(this);
             }
         }
 
@@ -734,23 +868,16 @@ namespace GamenChangerCore
             return FlickDirection.NONE;
         }
 
-        // 移動可能な方向を返す
-        private FlickDirection GetAvailableDirection(Vector2 deltaMove)
+        // インタラクション的に移動可能な方向を返す
+        // 実際に移動先にcornerが存在するわけではなく、deltaに左右要素があり左右どちらかがフリック可能であれば左右を、上下どちらかが
+        private FlickDirection GetInteractableDirection(Vector2 deltaMove)
         {
-            var estimatedFlickDir = EstimateFlickDir(deltaMove);
-
-            // 上位のハンドラがあれば追加する方向のリクエストを行う
-            if (parentHandler != null)
-            {
-                parentHandler.OnFlickRequestFromFlickableCorner(this, ref CornerFromLeft, ref CornerFromRight, ref CornerFromTop, ref CornerFromBottom, estimatedFlickDir);
-            }
-
             // ここで、deltaMoveの値に応じて実際に利用できる方向の判定を行い、移動可能な方向を限定して返す。
 
             var dir = FlickDirection.NONE;
 
             // 左右フリックをカバーできる状態
-            if (CornerFromLeft != null && CornerFromRight != null)
+            if (CornerFromLeft != null || CornerFromRight != null)
             {
                 dir = dir | FlickDirection.RIGHT;
                 dir = dir | FlickDirection.LEFT;
@@ -760,13 +887,15 @@ namespace GamenChangerCore
             }
 
             // 上下フリックをカバーできる状態
-            if (CornerFromTop != null && CornerFromBottom != null)
+            if (CornerFromTop != null || CornerFromBottom != null)
             {
                 dir = dir | FlickDirection.UP;
                 dir = dir | FlickDirection.DOWN;
 
                 return dir;
             }
+
+            // TODO: ここから下に来ることはない
 
             // 右か左をカバー
             {
@@ -819,6 +948,45 @@ namespace GamenChangerCore
             return dir;
         }
 
+
+        // 実際にフリック処理が発生させられる方向を返す。
+        private FlickDirection GetFlickableDirection(FlickDirection interactableDir)
+        {
+            var dir = FlickDirection.NONE;
+
+            // 左ドラッグが可能な場合左右にドラッグできる状態のため、左右から実際にフリック可能な方向をチョイスする。
+            if (interactableDir.HasFlag(FlickDirection.LEFT))
+            {
+                // 左右にインタラクション可能だが、実際に発生させられるフリック処理は右、左、左右のどれか一つ。
+                if (CornerFromRight != null)
+                {
+                    dir = dir | FlickDirection.LEFT;
+                }
+                if (CornerFromLeft != null)
+                {
+                    dir = dir | FlickDirection.RIGHT;
+                }
+                return dir;
+            }
+
+            // 上ドラッグが可能な場合上下にドラッグできる状態のため、上下から実際にフリック可能な方向をチョイスする。
+            if (interactableDir.HasFlag(FlickDirection.UP))
+            {
+                // 上下にインタラクション可能だが、実際に発生させられるフリック処理は上、下、上下のどれか一つ。
+                if (CornerFromTop != null)
+                {
+                    dir = dir | FlickDirection.DOWN;
+                }
+                if (CornerFromBottom != null)
+                {
+                    dir = dir | FlickDirection.UP;
+                }
+                return dir;
+            }
+
+            return dir;
+        }
+
         // 初期フリック方向を見積もる
         // 右 -> 左 -> 下 -> 上 の順に判定している。
         private FlickDirection EstimateFlickDir(Vector2 delta)
@@ -843,32 +1011,16 @@ namespace GamenChangerCore
             return FlickDirection.NONE;
         }
 
-
-        // dirを元に、移動できる方向を制限する。
-        private Vector2 ApplyConstraintToDir(FlickDirection dir, PointerEventData eventData)
+        // deltaから、現在設定されているdirに該当するmovement値を出力する。flickしない方向の値を消去する。
+        private float GetConstraintedDeltaMovement(FlickDirection dir, Vector2 delta)
         {
-            var basePos = eventData.pressPosition;// 押したworld位置
-            var currentPos = eventData.position;// 現在のタッチのworld位置
-
-            // 差分
-            var baseDiff = currentPos - basePos;
-
-            var x = baseDiff.x;
-            var y = baseDiff.y;
+            var x = delta.x;
+            var y = delta.y;
 
             // 左右
             if (dir.HasFlag(FlickDirection.RIGHT) || dir.HasFlag(FlickDirection.LEFT))
             {
-                if (!dir.HasFlag(FlickDirection.RIGHT))
-                {
-                    // 右フリックはできない前提
-                    x = Mathf.Min(0, x);
-                }
-                if (!dir.HasFlag(FlickDirection.LEFT))
-                {
-                    // 左フリックはできない前提
-                    x = Mathf.Max(0, x);
-                }
+                // 左右に動く
             }
             else
             {
@@ -879,21 +1031,89 @@ namespace GamenChangerCore
             // 上下
             if (dir.HasFlag(FlickDirection.DOWN) || dir.HasFlag(FlickDirection.UP))
             {
-                if (!dir.HasFlag(FlickDirection.DOWN))
-                {
-                    // 下フリックはできない前提
-                    y = Mathf.Max(0, y);
-                }
-                if (!dir.HasFlag(FlickDirection.UP))
-                {
-                    // 上フリックはできない前提
-                    y = Mathf.Min(0, y);
-                }
+                // 上下に動く
             }
             else
             {
                 // 上下には動かない
                 y = 0;
+            }
+
+            // 上下に動かない場合は左右に動くはずなのでxを返す
+            if (y == 0)
+            {
+                return x;
+            }
+
+            // 上下に動く場合はyを返す
+
+            return y;
+        }
+
+        // インタラクション可能な方向、フリック可能な方向から、実際に移動に使用する値を出力する。
+        private Vector2 GetConstraintedDiffMovement(FlickDirection interactableDir, FlickDirection flickableDir, Vector2 basePos, Vector2 currentPos)
+        {
+            // 差分
+            var baseDiff = currentPos - basePos;
+
+            var x = baseDiff.x;
+            var y = baseDiff.y;
+
+            // 左右にインタラクション可能
+            if (interactableDir.HasFlag(FlickDirection.RIGHT) || interactableDir.HasFlag(FlickDirection.LEFT))
+            {
+                // pass.
+            }
+            else
+            {
+                // 左右には動かない
+                x = 0;
+            }
+
+            // 上下にインタラクション可能
+            if (interactableDir.HasFlag(FlickDirection.DOWN) || interactableDir.HasFlag(FlickDirection.UP))
+            {
+                // pass.
+            }
+            else
+            {
+                // 上下には動かない
+                y = 0;
+            }
+
+            return new Vector2(x, y);
+        }
+
+        // flickableDirを元に移動サイズを制限する。
+        // flickできない方向へは、指定したサイズ以上は移動できない。
+        private Vector2 LimitMoveSizeByFlickableDir(FlickDirection flickableDir, Vector2 moveSize)
+        {
+            var x = moveSize.x;
+            var y = moveSize.y;
+
+            // 実際には右フリックが不可なので、EmptyCornerUnitSizeまでの引っ張りが可能
+            if (!flickableDir.HasFlag(FlickDirection.RIGHT))
+            {
+                x = Mathf.Min(EmptyCornerUnitSize, x);
+            }
+            // 実際には左フリックが不可なので、-EmptyCornerUnitSizeまでの引っ張りが可能
+            if (!flickableDir.HasFlag(FlickDirection.LEFT))
+            {
+                x = Mathf.Max(-EmptyCornerUnitSize, x);
+            }
+
+            // TODO: この辺試してない
+            // 実際には上フリックが不可なので、EmptyCornerUnitSizeまでの引っ張りが可能
+            if (!flickableDir.HasFlag(FlickDirection.UP))
+            {
+                y = Mathf.Min(EmptyCornerUnitSize, y);
+            }
+
+            // TODO: この辺試してない
+            // 実際には下フリックが不可なので、-EmptyCornerUnitSizeまでの引っ張りが可能
+            if (!flickableDir.HasFlag(FlickDirection.DOWN))
+            {
+                y = Mathf.Max(-EmptyCornerUnitSize, y);
             }
 
             return new Vector2(x, y);
@@ -988,16 +1208,22 @@ namespace GamenChangerCore
             }
         }
 
-        private void Move(Vector2 moveDiff)
+        private void Move(Vector2 moveDiff, FlickDirection inteactableDir)
         {
             currentRectTransform().anchoredPosition = initalPos + moveDiff;
 
             // 作用を受けるcornerの位置も、上記のdiffをもとに動作させる
-            switch (flickDir)
+            switch (inteactableDir)
             {
                 case FlickDirection.RIGHT | FlickDirection.LEFT:
-                    CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + moveDiff;
-                    CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + moveDiff;
+                    if (CornerFromLeft != null)
+                    {
+                        CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + moveDiff;
+                    }
+                    if (CornerFromRight != null)
+                    {
+                        CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + moveDiff;
+                    }
                     break;
                 case FlickDirection.RIGHT:
                     CornerFromLeft.currentRectTransform().anchoredPosition = cornerFromLeftInitialPos + moveDiff;
@@ -1006,8 +1232,14 @@ namespace GamenChangerCore
                     CornerFromRight.currentRectTransform().anchoredPosition = cornerFromRightInitialPos + moveDiff;
                     break;
                 case FlickDirection.UP | FlickDirection.DOWN:
-                    CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + moveDiff;
-                    CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + moveDiff;
+                    if (CornerFromBottom != null)
+                    {
+                        CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + moveDiff;
+                    }
+                    if (CornerFromTop != null)
+                    {
+                        CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + moveDiff;
+                    }
                     break;
                 case FlickDirection.UP:
                     CornerFromBottom.currentRectTransform().anchoredPosition = cornerFromBottomInitialPos + moveDiff;
@@ -1016,63 +1248,10 @@ namespace GamenChangerCore
                     CornerFromTop.currentRectTransform().anchoredPosition = cornerFromTopInitialPos + moveDiff;
                     break;
                 default:
-                    Debug.LogError("unsupported flickDir:" + flickDir);
+                    Debug.LogError("unsupported flickDir:" + inteactableDir);
                     break;
             }
         }
-
-        // 左、右、と上、下、どちらか一方のみがある時は制限された向きにのみmoveする。
-        private void ApplyPositionLimitByDirection()
-        {
-            switch (flickDir)
-            {
-                // 左右移動が可能なフリック
-                case FlickDirection.RIGHT | FlickDirection.LEFT:
-                    // リミッターなし
-                    break;
-
-                // 右に向かっていくオンリーのフリック
-                case FlickDirection.RIGHT:
-                    if (currentRectTransform().anchoredPosition.x < initalPos.x)
-                    {
-                        currentRectTransform().anchoredPosition = new Vector2(initalPos.x, currentRectTransform().anchoredPosition.y);
-                    }
-                    break;
-
-                // 左に向かっていくオンリーのフリック
-                case FlickDirection.LEFT:
-                    if (initalPos.x < currentRectTransform().anchoredPosition.x)
-                    {
-                        currentRectTransform().anchoredPosition = new Vector2(initalPos.x, currentRectTransform().anchoredPosition.y);
-                    }
-                    break;
-
-                // 上下移動が可能なフリック
-                case FlickDirection.UP | FlickDirection.DOWN:
-                    // リミッターなし
-                    break;
-
-                // 上に向かっていくオンリーのフリック
-                case FlickDirection.UP:
-                    if (currentRectTransform().anchoredPosition.y < initalPos.y)
-                    {
-                        currentRectTransform().anchoredPosition = new Vector2(currentRectTransform().anchoredPosition.x, initalPos.y);
-                    }
-                    break;
-
-                // 下に向かっていくオンリーのフリック
-                case FlickDirection.DOWN:
-                    if (initalPos.y < currentRectTransform().anchoredPosition.y)
-                    {
-                        currentRectTransform().anchoredPosition = new Vector2(currentRectTransform().anchoredPosition.x, initalPos.y);
-                    }
-                    break;
-                default:
-                    Debug.LogError("unsupported flickDir:" + flickDir);
-                    break;
-            }
-        }
-
 
         private void UpdateProgress(FlickDirection currentMovedDirection)
         {
@@ -1088,9 +1267,9 @@ namespace GamenChangerCore
                 var disappearProgress = Mathf.Max(0f, 1.0f - progress);
 
                 // 上流があればdisappear度合いを伝える
-                if (parentHandler != null)
+                if (handler != null)
                 {
-                    parentHandler.FlickableCornerDisppearProgress(this, disappearProgress);
+                    handler.FlickableCornerDisppearProgress(this, disappearProgress);
                 }
 
                 // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
@@ -1103,9 +1282,11 @@ namespace GamenChangerCore
                 switch (currentMovedDirection)
                 {
                     case FlickDirection.RIGHT:
-                        AppearProgress(CornerFromLeft, appearProgress); break;
+                        AppearProgress(CornerFromLeft, appearProgress);
+                        break;
                     case FlickDirection.LEFT:
-                        AppearProgress(CornerFromRight, appearProgress); break;
+                        AppearProgress(CornerFromRight, appearProgress);
+                        break;
                 }
 
                 return;
@@ -1120,9 +1301,9 @@ namespace GamenChangerCore
                 var disappearProgress = Mathf.Max(0f, 1.0f - progress);
 
                 // 上流があればdisappear度合いを伝える
-                if (parentHandler != null)
+                if (handler != null)
                 {
-                    parentHandler.FlickableCornerDisppearProgress(this, disappearProgress);
+                    handler.FlickableCornerDisppearProgress(this, disappearProgress);
                 }
 
                 // 自身の持っているcontentsに対応のものがあればdisappearProgressを伝える
@@ -1135,9 +1316,11 @@ namespace GamenChangerCore
                 switch (currentMovedDirection)
                 {
                     case FlickDirection.UP:
-                        AppearProgress(CornerFromBottom, appearProgress); break;
+                        AppearProgress(CornerFromBottom, appearProgress);
+                        break;
                     case FlickDirection.DOWN:
-                        AppearProgress(CornerFromTop, appearProgress); break;
+                        AppearProgress(CornerFromTop, appearProgress);
+                        break;
                 }
             }
         }
@@ -1164,13 +1347,15 @@ namespace GamenChangerCore
         // 出現度合いを上流に通知する
         private void SendAppearProgress(float progress)
         {
-            if (parentHandler != null)
+            if (handler != null)
             {
-                parentHandler.FlickableCornerAppearProgress(this, progress);
+                handler.FlickableCornerAppearProgress(this, progress);
             }
         }
 
-        private FlickDirection DetermineFlickResult()
+        // フリック成立かどうかを成立した方向で返す。
+        // 成立していない場合NONEが帰ってくる。
+        private FlickDirection DetermineFlickResult(FlickDirection flickDir)
         {
             var xDist = initalPos.x - currentRectTransform().anchoredPosition.x;
             var yDist = initalPos.y - currentRectTransform().anchoredPosition.y;
@@ -1288,6 +1473,7 @@ namespace GamenChangerCore
                 }
             }
         }
+
 
         // fromからtoへとつながる経路探索を行う
         public static bool TryFindingAutoFlickRoute(FlickableCorner from, FlickableCorner to, out GamenDriver driver)
@@ -1411,15 +1597,9 @@ namespace GamenChangerCore
             return false;
         }
 
-        // デバッグ用
-        private void Show(string title, params (string key, object param)[] p)
+        private void FrameLog(string message)
         {
-            var str = "title:" + title + "\n";
-            foreach (var pi in p)
-            {
-                str += "    " + pi.key + ":" + pi.param + ", \n";
-            }
-            Debug.Log(str);
+            Debug.Log("message:" + message + " frame:" + Time.frameCount + "\tidentity:" + identity);
         }
     }
 }

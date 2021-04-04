@@ -15,12 +15,6 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
         また、対象方向へのflick先が存在しない場合、OnFlickRequestFromFlickableCornerが呼び出され、その中でcornerを追加したり接続を切り替えることで
         無限にflick先を生成する、などができる。
     */
-    public void TouchOnFlickableCornerDetected(FlickableCorner flickableCorner)
-    {
-        Debug.Log("Touch:" + flickableCorner);
-        // TODO: この辺をどうにかして上位に伝えると、driveのキャンセルができるようになる。
-    }
-
 
     public void FlickableCornerWillBack(FlickableCorner flickableCorner)
     {
@@ -99,7 +93,7 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
 
     private int count = 0;
     // フリックの開始時にリクエストを検知し、ビューの建て増しと削除が可能になる。
-    public void OnFlickRequestFromFlickableCorner(FlickableCorner flickingCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir)
+    public bool OnFlickRequestFromFlickableCorner(FlickableCorner flickingCorner, ref Corner cornerFromLeft, ref Corner cornerFromRight, ref Corner cornerFromTop, ref Corner cornerFromBottom, FlickDirection plannedFlickDir)
     {
         Debug.Log("OnFlickRequestFromFlickableCorner:" + Time.frameCount);
         // leftが空なFlickableCornerに対して右フリックをした際、左側にコンテンツを偽造する
@@ -124,7 +118,7 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
             {
                 Debug.LogError("ボタンがない 1");
             }
-            return;
+            return true;
         }
 
         // rightが空なFlickableCornerに対して左フリックをした際、右側にコンテンツを偽造する
@@ -149,8 +143,10 @@ public class MyFlickDetector : MonoBehaviour, IFlickableCornerHandler
             {
                 Debug.LogError("ボタンがない 2");
             }
-            return;
+            return true;
         }
+
+        return true;
     }
 
     public void OnFlickProcessAnimationRequired(FlickableCorner flickableCorner, Vector2 targetPosition, Action onDone, Action onCancelled)

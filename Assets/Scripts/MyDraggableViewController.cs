@@ -14,10 +14,10 @@ public class MyDraggableViewController : MonoBehaviour, IDraggableCornerHandler
 
     public void OnDragApproachingToGrid(int index, GameObject go)
     {
-        OnDragDoneOnGrid(index, go);
+        OnDragReachedOnGrid(index, go);
     }
 
-    public void OnDragDoneOnGrid(int index, GameObject go)
+    public void OnDragReachedOnGrid(int index, GameObject go)
     {
         var text = go.GetComponentInChildren<Text>();
         switch (index)
@@ -37,7 +37,7 @@ public class MyDraggableViewController : MonoBehaviour, IDraggableCornerHandler
         }
     }
 
-    public void OnDragCancelled(int index, GameObject go)
+    public void OnDragBacked(int index, GameObject go)
     {
         Debug.Log("index:" + index + " go:" + go);
     }
@@ -63,7 +63,7 @@ public class MyDraggableViewController : MonoBehaviour, IDraggableCornerHandler
         StartCoroutine(approach());
     }
 
-    public void OnDragCancelAnimationRequired(GameObject go, Vector2 initialPosition, Action onDone)
+    public void OnDragBackAnimationRequired(GameObject go, Vector2 initialPosition, Action onDone)
     {
         var rectTrans = go.GetComponent<RectTransform>();
         IEnumerator cancel()

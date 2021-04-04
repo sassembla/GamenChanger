@@ -7,6 +7,7 @@ namespace GamenChangerCore
     public interface IOneOfNCornerHandler
     {
         void OnOneOfNCornerReloaded(GameObject one, GameObject[] all, Action<GameObject> setOneOfNAct);
+        bool OneOfNCornerShouldAcceptInput();
         void OnOneOfNChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all);
         void OnOneOfNChangedToOneByHandler(GameObject one, GameObject before, GameObject[] all);
     }

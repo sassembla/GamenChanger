@@ -141,9 +141,33 @@ namespace GamenChangerCore
                 }
             );
         }
-
+        private int doneFrame = -1;
         public void OnPointerUp(PointerEventData eventData)
         {
+            var should = listener.OneOfNCornerShouldAcceptInput();
+            if (should)
+            {
+                // pass.
+            }
+            else
+            {
+                // 無視する。
+                return;
+            }
+
+            // 同一フレームでの入力を一つだけ受け取るように排他処理を行う
+            var currentFrame = Time.frameCount;
+            if (doneFrame != currentFrame)
+            {
+                doneFrame = currentFrame;
+            }
+            else
+            {
+                // 同一フレームでの入力が既にあったので無視する
+                return;
+            }
+
+
             var currentReactedObject = eventData.pointerPress;
 
             // すでに同じオブジェクトが押された後であれば無視する

@@ -3,8 +3,6 @@ namespace GamenChangerCore
     // TODO: なんか名前が気に食わない、CornerなんとかHandlerだろうな
     public interface ICornerContent
     {
-        void CornerTouchDetected();
-
         void CornerAppearProgress(float progress);
 
         void CornerWillAppear();

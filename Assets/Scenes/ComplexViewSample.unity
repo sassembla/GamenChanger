@@ -1004,6 +1004,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ReactUnitSize: 390
   MoveUnitSize: 1170
+  EmptyCornerUnitSize: 234
   CornerFromLeft: {fileID: 1856156642}
   CornerFromRight: {fileID: 0}
   CornerFromTop: {fileID: 0}
@@ -1914,6 +1915,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ReactUnitSize: 390
   MoveUnitSize: 1170
+  EmptyCornerUnitSize: 234
   CornerFromLeft: {fileID: 1933242003}
   CornerFromRight: {fileID: 1856156642}
   CornerFromTop: {fileID: 0}
@@ -2009,6 +2011,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ReactUnitSize: 390
   MoveUnitSize: 1170
+  EmptyCornerUnitSize: 234
   CornerFromLeft: {fileID: 1572851561}
   CornerFromRight: {fileID: 802936764}
   CornerFromTop: {fileID: 0}
@@ -2104,6 +2107,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ReactUnitSize: 390
   MoveUnitSize: 1170
+  EmptyCornerUnitSize: 234
   CornerFromLeft: {fileID: 0}
   CornerFromRight: {fileID: 1572851561}
   CornerFromTop: {fileID: 0}

@@ -402,7 +402,7 @@ namespace GamenChangerCore
                             }
 
                             ResetToInitialPosition(dragObject);
-                            listener.OnDragCancelled(candidatePointIndex, dragObject.contentRectTrans.gameObject);
+                            listener.OnDragBacked(candidatePointIndex, dragObject.contentRectTrans.gameObject);
 
                             SetToNone();
                             yield break;
@@ -457,7 +457,7 @@ namespace GamenChangerCore
                 SetToTargetPosition(dragObject, approachTargetPoint);
 
                 // 通知を行う
-                listener.OnDragDoneOnGrid(candidatePointIndex, dragObject.contentRectTrans.gameObject);
+                listener.OnDragReachedOnGrid(candidatePointIndex, dragObject.contentRectTrans.gameObject);
             }
             else if (cancelled)
             {
@@ -478,7 +478,7 @@ namespace GamenChangerCore
             };
 
             // キャンセルアニメーション開始
-            listener.OnDragCancelAnimationRequired(dragObject.contentRectTrans.gameObject, dragObject.initialAnchoredPosition, onDone);
+            listener.OnDragBackAnimationRequired(dragObject.contentRectTrans.gameObject, dragObject.initialAnchoredPosition, onDone);
 
             while (!done)
             {
@@ -489,7 +489,7 @@ namespace GamenChangerCore
             ResetToInitialPosition(dragObject);
 
             // 通知を行う
-            listener.OnDragCancelled(candidatePointIndex, dragObject.contentRectTrans.gameObject);
+            listener.OnDragBacked(candidatePointIndex, dragObject.contentRectTrans.gameObject);
         }
 
 
@@ -538,7 +538,7 @@ namespace GamenChangerCore
                     diff,
                     drivenRectTrans =>
                     {
-                        listener.OnDragDoneOnGrid(toIndex, candidatePointContentRectTrans.gameObject);
+                        listener.OnDragReachedOnGrid(toIndex, candidatePointContentRectTrans.gameObject);
                     }
                 );
                 return true;

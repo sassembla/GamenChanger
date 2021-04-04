@@ -32,6 +32,11 @@ public class MyFlickableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         flickDetector.selectIndicator = index => setToOneOfNAct(all[index]);
     }
 
+    public bool OneOfNCornerShouldAcceptInput()
+    {
+        return true;
+    }
+
     public void OnOneOfNChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all)
     {
         // sequeのどれか一つがUI操作によって更新された

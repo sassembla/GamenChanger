@@ -13,14 +13,14 @@ namespace GamenChangerCore
         void OnDragApproachingToGrid(int index, GameObject go);
 
         // dragしているオブジェクトがどのグリッドに接地したか通知する。
-        void OnDragDoneOnGrid(int index, GameObject go);
+        void OnDragReachedOnGrid(int index, GameObject go);
 
         // cancelが発生したことを通知する。
-        void OnDragCancelled(int index, GameObject go);
+        void OnDragBacked(int index, GameObject go);
 
         // アニメーション系
 
         void OnDragApproachAnimationRequired(int index, GameObject go, Vector2 approachTargetPosition, Action onDone, Action onCancelled);
-        void OnDragCancelAnimationRequired(GameObject go, Vector2 initialPosition, Action onDone);
+        void OnDragBackAnimationRequired(GameObject go, Vector2 initialPosition, Action onDone);
     }
 }

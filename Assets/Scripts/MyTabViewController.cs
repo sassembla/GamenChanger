@@ -50,6 +50,11 @@ public class MyTabViewController : MonoBehaviour, IOneOfNCornerHandler
         this.setToOneOfNAct = setToOneOfNAct;
     }
 
+    public bool OneOfNCornerShouldAcceptInput()
+    {
+        return true;
+    }
+
     public void OnOneOfNChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all)
     {
         // UIの調整
