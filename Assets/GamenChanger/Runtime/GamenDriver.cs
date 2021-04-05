@@ -181,7 +181,7 @@ namespace GamenChangerCore
 
 
             // 関連する全てのFlickableCornerと関連CornerのrectTransformを収集する。
-            var relatedAllFlickableCornerRectTransforms = flickableSteps[0].CollectRelatedFlickableCorners();
+            var relatedAllFlickableCornerRectTransforms = flickableSteps[0].CollectRelatedFlickableCornersRectTrans();
 
             // 開始位置を収集
             // このcorの中では一貫してpositionを使っている。

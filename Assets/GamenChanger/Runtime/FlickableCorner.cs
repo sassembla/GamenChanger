@@ -9,7 +9,6 @@ namespace GamenChangerCore
     /*
         フリック可能なCorner
         // TODO: Editor上で、対象となるhandlerやcornerを見つけてinspectorに表示不可だがクリックすると光るボタンとして表示したい感じある。
-        // TODO: フリック操作の結果表示されてきた別のビューにタッチしたら反応、というのをやりたい。っていうかどうするといいんだろう。一番楽なのはひとまとめに扱うことなんだけど、、
         // TODO: flick不可能な方向へのフリックの結果発生する、遷移できないドラッグへとバネを実装したい。まあどうやんのっていう話ではあるが
         // TODO: タッチ入力による加速度のバーチャライズをしたい。加速によってフリックを達成させるという感じ。手始めにデルタの加速度を計測してみるか。
     */
@@ -26,6 +25,25 @@ namespace GamenChangerCore
         // このCornerのデフォルト位置
         private Vector2 initalPos;
 
+
+        // flickが発生してる場合trueを返す。
+        internal bool HasActiveFlick()
+        {
+            return flickIdentity != null;
+        }
+
+        // アニメーション中な場合trueを返す。
+        internal bool IsAnimating()
+        {
+            return animationState != FlickAnimationState.NONE;
+        }
+
+        internal void InactivateCurrentFlickIdentity()
+        {
+            FrameLog("InactivateCurrentFlickIdentityって言われた状態、さてどうなる？");
+            flickIdentity = null;
+        }
+
         // このFlickableCornerと、さらに同一レイヤーに存在する全てのFlickableCornerのイベントを受け取るハンドラ。
         // 別に単に切り替わる画面が欲しい場合もあるため、参照が存在しない場合も許容する。
         private IFlickableCornerHandler handler;
@@ -38,6 +56,8 @@ namespace GamenChangerCore
 
         // このFlickableCornerに対して発生しているflickの一意なインスタンスが持つ要素。
         // 複数のタッチが継続的に動作するのを、一つのflick操作として認識するために生成される。
+
+        // 収集くんを流すのが良さそう、そんでそれが同期的に流れれば良さそう。
         private class FlickIdentity
         {
             private int currentTouchId = -2;
@@ -81,7 +101,7 @@ namespace GamenChangerCore
             }
         }
 
-        private FlickIdentity identity;
+        private FlickIdentity flickIdentity;
 
         // この画面でdrag操作として認められ、まだendしていないタッチのidを収集してあるもの。
         private List<int> currentTouchIds = new List<int>();
@@ -113,6 +133,17 @@ namespace GamenChangerCore
                     {
                         handler = transform.parent.GetComponent<IFlickableCornerHandler>();
                     }
+
+                    // ネットワークの構築を行う(すでに別の連結している要素によってセットされている可能性はある)
+                    if (fNetworkObject == null)
+                    {
+                        fNetworkObject = new FlickableCornersNetwork();
+                        UpdateNetworkByAddedOrRemovedRelatedCorner(ref fNetworkObject);
+                    }
+                    else
+                    {
+                        return;
+                    }
                 },
                 excludedGameObject =>
                 {
@@ -140,7 +171,7 @@ namespace GamenChangerCore
         public void OnPointerEnter(PointerEventData eventData)
         {
             // アニメーション中なら入力を受け付けない
-            if (animationState != FlickAnimationState.NONE)
+            if (IsAnimating())
             {
                 return;
             }
@@ -162,13 +193,13 @@ namespace GamenChangerCore
         public void OnDrag(PointerEventData eventData)
         {
             // アニメーション中なら入力を受け付けない
-            if (animationState != FlickAnimationState.NONE)
+            if (IsAnimating())
             {
                 return;
             }
 
             // まだflick生成 = flick開始前であれば、判定を行う。
-            if (identity == null)
+            if (flickIdentity == null)
             {
                 var delta = eventData.delta;
 
@@ -178,12 +209,26 @@ namespace GamenChangerCore
                     // 値から該当しそうなフリック方向を推定する
                     var estimatedFlickDir = EstimateFlickDir(delta);
 
+                    var currentReferences = new string[] { CornerFromLeft?.CornerId, CornerFromRight?.CornerId, CornerFromTop?.CornerId, CornerFromBottom?.CornerId };
+
                     var isAccepted = handler.OnFlickRequestFromFlickableCorner(this, ref CornerFromLeft, ref CornerFromRight, ref CornerFromTop, ref CornerFromBottom, estimatedFlickDir);
 
                     // ハンドラが受け付けなければ動かない
                     if (!isAccepted)
                     {
                         return;
+                    }
+
+                    // ここで参照が変更されている可能性がある。
+                    // 参照が変更されていたりしたら、networkを再構築する。
+                    if (currentReferences[0] == CornerFromLeft?.CornerId && currentReferences[1] == CornerFromRight?.CornerId && currentReferences[2] == CornerFromTop?.CornerId && currentReferences[3] == CornerFromBottom?.CornerId)
+                    {
+                        // pass.
+                    }
+                    else
+                    {
+                        // 変更が検知できたので実行する。
+                        UpdateNetworkByAddedOrRemovedRelatedCorner(ref fNetworkObject);
                     }
                 }
 
@@ -196,11 +241,18 @@ namespace GamenChangerCore
                     return;
                 }
 
-                FrameLog("this:" + this.gameObject.name + " がdragを受け取った");
-                var flickableDir = GetFlickableDirection(interactableFlickDir);
+                // flickを開始したことを他のFlickableCornerに伝える
+                var approved = fNetworkObject.FlickInitializeRequest(this.CornerId, eventData.pointerId);
+
+                // 許可されなかったので終了
+                if (!approved)
+                {
+                    return;
+                }
 
                 // flickを初期化する。
-                identity = new FlickIdentity(eventData.pointerId, interactableFlickDir, flickableDir);
+                var flickableDir = GetFlickableDirection(interactableFlickDir);
+                flickIdentity = new FlickIdentity(eventData.pointerId, interactableFlickDir, flickableDir);
 
                 // 初期位置を規定して差分で移動させる準備をする。
                 UpdateInitialPos();
@@ -229,7 +281,7 @@ namespace GamenChangerCore
             // このフレームで動いたすべてのdragの差分の中で、最大のものを収集する。
             // deltaの比較を行う。
             var deltaOfThisPointerDrag = eventData.delta;
-            var dirConstrainedDeltaMovementOfThisPointerDrag = GetConstraintedDeltaMovement(identity.interactableDir, deltaOfThisPointerDrag);
+            var dirConstrainedDeltaMovementOfThisPointerDrag = GetConstraintedDeltaMovement(flickIdentity.interactableDir, deltaOfThisPointerDrag);
 
             // deltaの値が大きい場合、採用する。
             // TODO: ここに一定以上のサイズだったら〜とかを足すと良さそう。微動を拾わないで済む。
@@ -265,12 +317,21 @@ namespace GamenChangerCore
             if (currentTouchIds.Contains(continuedOrAwakeOrNewTouchId))
             {
                 // 旧知のタッチの中で、今までidentityが保持していたタッチが継続して動作した
-                if (identity.TouchId == continuedOrAwakeOrNewTouchId)
+                if (flickIdentity.TouchId == continuedOrAwakeOrNewTouchId)
                 {
                     // 何もしない
                 }
                 else // 旧知のタッチの中で、休眠していたタッチが復帰して動作した
                 {
+                    // タッチが復帰してflickを開始したことを他のFlickableCornerに伝える
+                    var approved = fNetworkObject.FlickAwakeRequest(this.CornerId, eventData.pointerId);
+
+                    // 許可されなかったので終了
+                    if (!approved)
+                    {
+                        return;
+                    }
+
                     // 休眠から復帰したタッチの動きを扱う。
                     // 休眠していたタッチを再度動かすと、その初期位置は最初にそのタッチを開始した場所そのままになるため、そのままdiffを計算すると動作差分が一気に増えてしまってdragを継続するときに都合が悪い。
                     // そのため、新たに発生したタッチと動作が同じになるように、このイベントのpressPositionを[1フレーム前の値]に上書きする。
@@ -300,13 +361,13 @@ namespace GamenChangerCore
             }
 
             // identityがない状態でのendは無視する
-            if (identity == null)
+            if (flickIdentity == null)
             {
                 return;
             }
 
             // 現在主として扱っているtouchId以外のendは無視する
-            if (identity.TouchId != eventData.pointerId)
+            if (flickIdentity.TouchId != eventData.pointerId)
             {
                 return;
             }
@@ -314,7 +375,7 @@ namespace GamenChangerCore
             // identityに登録されているtouchIdのポインターがendDragした場合、flickを終了する。
 
             // 実際にフリック可能な方向からフリック結果を取得する。
-            var flickedDir = DetermineFlickResult(identity.flickableDir);
+            var flickedDir = DetermineFlickResult(flickIdentity.flickableDir);
 
             // progressの更新を行う
             UpdateProgress(flickedDir);
@@ -385,7 +446,7 @@ namespace GamenChangerCore
             this.animationCor = animationCor();
 
             // TODO: identityの初期化をやっていいのかどうかがわからない。hiddenな上位でやらせた方がいい気はする。さて、それってどうしようか。
-            identity = null;
+            flickIdentity = null;
         }
 
         private IEnumerator ProcessingCor(FlickDirection flickedDir)
@@ -562,19 +623,19 @@ namespace GamenChangerCore
         private void UpdateFlickableViewMovement(int index, Vector2 initialPos, Vector2 currentPos)
         {
             // 従来のtouchのdragを検出した。
-            if (identity.TouchId == index)
+            if (flickIdentity.TouchId == index)
             {
                 // 初期点からdir方向にdragした距離を計測する。
-                var continuousDragDiffFromInitialOfThisDrag = GetConstraintedDiffMovement(identity.interactableDir, identity.flickableDir, initialPos, currentPos);
+                var continuousDragDiffFromInitialOfThisDrag = GetConstraintedDiffMovement(flickIdentity.interactableDir, flickIdentity.flickableDir, initialPos, currentPos);
 
                 // inherited + 特定の方向へと移動させたことにする。
                 // 実際にflickできる方向を加味した移動サイズを出す。
-                var continuousMoveSize = LimitMoveSizeByFlickableDir(identity.flickableDir, continuousDragDiffFromInitialOfThisDrag + identity.InheritedDiff);
+                var continuousMoveSize = LimitMoveSizeByFlickableDir(flickIdentity.flickableDir, continuousDragDiffFromInitialOfThisDrag + flickIdentity.InheritedDiff);
 
-                Move(continuousMoveSize, identity.interactableDir);
+                Move(continuousMoveSize, flickIdentity.interactableDir);
 
                 // identityが持っているdiffの情報をアップデートする。
-                identity.UpdateDiff(continuousDragDiffFromInitialOfThisDrag);
+                flickIdentity.UpdateDiff(continuousDragDiffFromInitialOfThisDrag);
                 return;
             }
 
@@ -591,19 +652,19 @@ namespace GamenChangerCore
             var newTouchId = index;
 
             // 新しいtouchのdragによる値を算出し、これまでのtouchで保持していた値をinheritする。
-            identity.UpdateTouchId(newTouchId);
+            flickIdentity.UpdateTouchId(newTouchId);
 
             // 初期点からdir方向にdragした距離を計測する。
-            var newDragDiffFromInitialOfThisDrag = GetConstraintedDiffMovement(identity.interactableDir, identity.flickableDir, initialPos, currentPos);
+            var newDragDiffFromInitialOfThisDrag = GetConstraintedDiffMovement(flickIdentity.interactableDir, flickIdentity.flickableDir, initialPos, currentPos);
 
             // inherited + 特定の方向へと移動させたことにする。
             // 実際にflickできる方向を加味した移動サイズを出す。
-            var newMoveSize = LimitMoveSizeByFlickableDir(identity.flickableDir, newDragDiffFromInitialOfThisDrag + identity.InheritedDiff);
+            var newMoveSize = LimitMoveSizeByFlickableDir(flickIdentity.flickableDir, newDragDiffFromInitialOfThisDrag + flickIdentity.InheritedDiff);
 
-            Move(newMoveSize, identity.interactableDir);
+            Move(newMoveSize, flickIdentity.interactableDir);
 
             // identityが持っているdiffの情報をアップデートする。
-            identity.UpdateDiff(newDragDiffFromInitialOfThisDrag);
+            flickIdentity.UpdateDiff(newDragDiffFromInitialOfThisDrag);
         }
 
         public float ReactUnitSize;// 反応サイズ、これを超えたら要素をmoveUnitSizeまで移動させる。
@@ -1426,7 +1487,62 @@ namespace GamenChangerCore
             }
         }
 
-        public RectTransform[] CollectRelatedFlickableCorners()
+
+        // flick情報を統合的に扱うための共有インスタンス
+        private FlickableCornersNetwork fNetworkObject;
+        private void UpdateNetwork(ref FlickableCornersNetwork networkRef)
+        {
+            this.fNetworkObject = networkRef;
+        }
+
+
+        // 接続されている全てのflickableCornerの集合を更新する
+        // どのFlickableCornerが起点となって実行されても問題ない。
+        // 初期化時、更新時に実行する。
+        private void UpdateNetworkByAddedOrRemovedRelatedCorner(ref FlickableCornersNetwork sharedRef)
+        {
+            UpdateNetworkRecursively(this, ref sharedRef);
+        }
+
+        private void UpdateNetworkRecursively(FlickableCorner root, ref FlickableCornersNetwork networkRef)
+        {
+            networkRef.Join(this);
+
+            if (CornerFromRight != null && CornerFromRight != root && CornerFromRight is FlickableCorner)
+            {
+                var fCorner = (FlickableCorner)CornerFromRight;
+                networkRef.Join(fCorner);
+                fCorner.UpdateNetwork(ref networkRef);
+                fCorner.UpdateNetworkRecursively(this, ref networkRef);
+            }
+
+            if (CornerFromLeft != null && CornerFromLeft != root && CornerFromLeft is FlickableCorner)
+            {
+                var fCorner = (FlickableCorner)CornerFromLeft;
+                networkRef.Join(fCorner);
+                fCorner.UpdateNetwork(ref networkRef);
+                fCorner.UpdateNetworkRecursively(this, ref networkRef);
+            }
+
+            if (CornerFromTop != null && CornerFromTop != root && CornerFromTop is FlickableCorner)
+            {
+                var fCorner = (FlickableCorner)CornerFromTop;
+                networkRef.Join(fCorner);
+                fCorner.UpdateNetwork(ref networkRef);
+                fCorner.UpdateNetworkRecursively(this, ref networkRef);
+            }
+
+            if (CornerFromBottom != null && CornerFromBottom != root && CornerFromBottom is FlickableCorner)
+            {
+                var fCorner = (FlickableCorner)CornerFromBottom;
+                networkRef.Join(fCorner);
+                fCorner.UpdateNetwork(ref networkRef);
+                fCorner.UpdateNetworkRecursively(this, ref networkRef);
+            }
+        }
+
+        // 接続しているCornerすべてのRectTransformを取得する
+        public RectTransform[] CollectRelatedFlickableCornersRectTrans()
         {
             var rectTrans = new List<RectTransform>();
             CollectRelatedRectTrans(ref rectTrans, this);
@@ -1599,7 +1715,7 @@ namespace GamenChangerCore
 
         private void FrameLog(string message)
         {
-            Debug.Log("message:" + message + " frame:" + Time.frameCount + "\tidentity:" + identity);
+            Debug.Log("message:" + message + " frame:" + Time.frameCount + "\tidentity:" + flickIdentity);
         }
     }
 }

@@ -17,6 +17,8 @@ namespace GamenChangerCore
     */
     public class Corner : MonoBehaviour
     {
+        public readonly string CornerId = Guid.NewGuid().ToString();
+
         protected RectTransform[] containedUIComponents = null;
 
         public RectTransform currentRectTransform()
