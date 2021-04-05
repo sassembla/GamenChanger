@@ -13,7 +13,7 @@ namespace GamenChangerCore
         OneOfNを作ってみる -> できた
         prefabを使ったcorner生成のフローなどをつくってみる -> できた
         sequeがあるFlickableViewを作ってみる -> できた
-        TODO: draggableなsequeがあるFlickableViewを作ってみる
+        draggableなsequeがあるFlickableViewを作ってみる -> できた
     */
     public class Corner : MonoBehaviour
     {

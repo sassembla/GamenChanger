@@ -404,9 +404,6 @@ namespace GamenChangerCore
                                 yield return null;
                             }
 
-                            ResetToInitialPosition(dragObject);
-                            listener.OnDragBacked(candidatePointIndex, dragObject.contentRectTrans.gameObject);
-
                             SetToNone();
                             yield break;
                         case DragState.APPROACHING:

@@ -565,16 +565,24 @@ namespace GamenChangerCore
             // エディタでのみ、タッチインがどこから行われたかを判定するために、フレームごとにタッチが画面内にあるかどうかを取得する。
             {
 #if UNITY_EDITOR
-                var x = Input.mousePosition.x;
-                var y = Input.mousePosition.y;
-                if (0 <= x && x <= Screen.width && 0 <= y && y <= Screen.height)
+                try
                 {
-                    // in screen.
-                    touchInScreenForEditor = true;
+                    var x = Input.mousePosition.x;
+                    var y = Input.mousePosition.y;
+                    if (0 <= x && x <= Screen.width && 0 <= y && y <= Screen.height)
+                    {
+                        // in screen.
+                        touchInScreenForEditor = true;
+                    }
+                    else// マウスがスクリーン外な場合、このフレームでのマウス位置をフレーム外に持っていく。
+                    {
+                        touchInScreenForEditor = false;
+                    }
                 }
-                else// マウスがスクリーン外な場合、このフレームでのマウス位置をフレーム外に持っていく。
+                catch
                 {
-                    touchInScreenForEditor = false;
+                    // InputSystemを使うと問題が出るが、まあエディタなので、、
+                    // TODO: 今使っているのがInputSystemなのかInputManagerなのかで判定をしたいが、さて？
                 }
 #endif
             }
