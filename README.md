@@ -44,11 +44,19 @@ IOneOfNCorner interface receives "choose" events from OneOfN.
 
 
 ### 2-3. DraggableCorner
-DraggableCorner can have 1 or more contents and enable it to draggable and limit it's move to inside of the size of the DraggableCorner attached object.
+DraggableCorner can have 1 or more contents and add draggable feature, limit it's move to inside of the region of the DraggableCorner attached object.
 
 
 ### 2-4. OverlayCorner(WIP)
 OverlayCorner can have one additional Corner and set it to back of this OverlayCorner when active.
+
+
+
+ ## todo
+ * implement OverlayCorner.
+ * add accelelation parameter to the touch of flick gesture.
+ * editor/device sync feature
+ * bug fix
 
 
 ## furure(WIP)
