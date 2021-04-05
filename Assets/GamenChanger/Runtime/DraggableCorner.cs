@@ -7,10 +7,13 @@ using UnityEngine.EventSystems;
 namespace GamenChangerCore
 {
     // TODO: 複数のdraggableどうしが重なるのを許すかどうか -> 需要が見合ってないのでやらない
-    // TODO: constraint
     // TODO: 既にgridに要素があったらreject？ -> 難しそうだからやらない
     public class DraggableCorner : Corner
     {
+        public bool ConstraintHorizontal = false;
+        public bool ConstraintVertical = false;
+
+
         private enum DragState
         {
             NONE,
@@ -572,6 +575,14 @@ namespace GamenChangerCore
         // 移動させる
         private void Move(DragObject dragObject, Vector2 diff)
         {
+            if (ConstraintHorizontal)
+            {
+                diff.y = 0;
+            }
+            if (ConstraintVertical)
+            {
+                diff.x = 0;
+            }
             dragObject.contentRectTrans.anchoredPosition = dragObject.initialAnchoredPosition + diff;
         }
 

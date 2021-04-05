@@ -8,7 +8,6 @@ namespace GamenChangerCore
         public OneOfNCorner parent;
         public void OnPointerUp(PointerEventData eventData)
         {
-            Debug.Log("root frame:" + Time.frameCount);
             parent.OnPointerUp(eventData);
         }
     }

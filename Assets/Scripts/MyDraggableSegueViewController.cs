@@ -25,6 +25,7 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         // iOS/Android用に60FPS化
         Application.targetFrameRate = 60;
 
+
         // DraggableはfloatButtonのみを含み、OneOfはfloatButton以外を含むようにする。
         // DraggableとOneOfを相互に排他の状態にする。
 
@@ -64,6 +65,9 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         }
     }
 
+
+    // drag系
+
     public Vector2[] OnDraggableCornerInitialized(Func<int, int, GamenDriver> draggableDriver)
     {
         // このdraggable用のdriverを取得しておく
@@ -77,7 +81,6 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
             new Vector2(0.25f*3 + 0.25f / 2f, 0.5f),
         };
     }
-
 
     public void OnDragApproachAnimationRequired(int index, GameObject go, Vector2 approachTargetPosition, Action onDone, Action onCancelled)
     {
@@ -133,10 +136,7 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         StartCoroutine(cancel());
     }
 
-    public void OnDragBacked(int index, GameObject go)
-    {
-        // 何もしない
-    }
+    public void OnDragBacked(int index, GameObject go) { }
 
     public void OnDragApproachingToGrid(int index, GameObject go)
     {
@@ -214,15 +214,10 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         return !animating;
     }
 
-    public void OnOneOfNChangedToOneByHandler(GameObject one, GameObject before, GameObject[] all)
-    {
-        // OneOfがコードから選択された。特に何もしない。
-    }
+    public void OnOneOfNChangedToOneByHandler(GameObject one, GameObject before, GameObject[] all) { }// 何もしない
 
     public void OnOneOfNChangedToOneByPlayer(GameObject one, GameObject before, GameObject[] all)
     {
-        // Debug.Log("OnOneOfNChangedToOneByPlayer animating:" + animating + " frame:" + Time.frameCount);
-
         // プレイヤーがUI上のButton1~4のどれかを押したので、flickViewとfloatButtonを移動させる。
         if (FlickableCornersCorner.TryExposureCorners<FlickableCorner>(out var flickableCorners))
         {
@@ -320,15 +315,8 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         return true;
     }
 
-    public void FlickableCornerWillBack(FlickableCorner flickableCorner)
-    {
-        // 何もしない
-    }
-
-    public void FlickableCornerWillCancel(FlickableCorner flickableCorner)
-    {
-        // 何もしない
-    }
+    public void FlickableCornerWillBack(FlickableCorner flickableCorner) { }
+    public void FlickableCornerWillCancel(FlickableCorner flickableCorner) { }
 
     public void FlickableCornerWillAppear(FlickableCorner flickableCorner)
     {
@@ -396,40 +384,13 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
         SelectSegue(targetIndex);
     }
 
-    public void FlickableCornerAppearProgress(FlickableCorner flickableCorner, float progress)
-    {
-        // 何もしない
-    }
-
-    public void FlickableCornerAppearCancelled(FlickableCorner flickableCorner)
-    {
-        // 何もしない
-    }
-
-    public void FlickableCornerDidAppear(FlickableCorner flickableCorner)
-    {
-        // 何もしない
-    }
-
-    public void FlickableCornerWillDisappear(FlickableCorner flickableCorner)
-    {
-        // 何もしない
-    }
-
-    public void FlickableCornerDisppearProgress(FlickableCorner flickableCorner, float progress)
-    {
-        // 何もしない
-    }
-
-    public void FlickableCornerDisppearCancelled(FlickableCorner flickableCorner)
-    {
-        // 何もしない
-    }
-
-    public void FlickableCornerDidDisappear(FlickableCorner flickableCorner)
-    {
-        // 何もしない
-    }
+    public void FlickableCornerAppearProgress(FlickableCorner flickableCorner, float progress) { }
+    public void FlickableCornerAppearCancelled(FlickableCorner flickableCorner) { }
+    public void FlickableCornerDidAppear(FlickableCorner flickableCorner) { }
+    public void FlickableCornerWillDisappear(FlickableCorner flickableCorner) { }
+    public void FlickableCornerDisppearProgress(FlickableCorner flickableCorner, float progress) { }
+    public void FlickableCornerDisppearCancelled(FlickableCorner flickableCorner) { }
+    public void FlickableCornerDidDisappear(FlickableCorner flickableCorner) { }
 
     public void OnFlickProcessAnimationRequired(FlickableCorner flickableCorner, Vector2 targetPosition, Action onDone, Action onCancelled)
     {
@@ -535,7 +496,6 @@ public class MyDraggableSegueViewController : MonoBehaviour, IOneOfNCornerHandle
     private bool animating;
     public bool IsRaycastLocationValid(Vector2 sp, Camera eventCamera)
     {
-        // Debug.Log("animating:" + animating + " frame:" + Time.frameCount);// TODO: あー同じ条件でdragも無効化すればいいのか。
         return !animating;
     }
 }

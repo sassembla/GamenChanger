@@ -48,16 +48,8 @@ namespace GamenChangerCore
         // 別に単に切り替わる画面が欲しい場合もあるため、参照が存在しない場合も許容する。
         private IFlickableCornerHandler handler;
 
-        // このアプリケーション上に存在する全てのFlickableCornerが所属するネットワーク、、とか、そういうの、、いやーーうーんん、、
-        // 単になんかタッチが跨いでも問題なければいいだけなんだよな、、それって簡単に解決できないかな、、フォーカスの概念があればいけるか？
-        // private static Dictionary<int, FlickableCornerNetwork> network = new Dictionary<int, FlickableCornerNetwork>();
-        // private static List<> なんかsharedなタッチの情報をここに乗っけておいて、探索して他にもいれば、とかができる気はするが、
-        // そもそも付け焼き刃でやらない方がいい気はしている。あとでやろう。
-
         // このFlickableCornerに対して発生しているflickの一意なインスタンスが持つ要素。
         // 複数のタッチが継続的に動作するのを、一つのflick操作として認識するために生成される。
-
-        // 収集くんを流すのが良さそう、そんでそれが同期的に流れれば良さそう。
         private class FlickIdentity
         {
             private int currentTouchId = -2;

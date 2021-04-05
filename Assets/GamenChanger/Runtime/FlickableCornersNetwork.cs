@@ -14,8 +14,6 @@ namespace GamenChangerCore
                 return;
             }
 
-            Debug.Log("足してる flickableCorner:" + flickableCorner);
-
             network.Add(flickableCorner);
         }
 
